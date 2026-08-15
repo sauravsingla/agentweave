@@ -10,7 +10,7 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from agentweave.analyzer import RequirementAnalyzer
+from agentweave import RequirementAnalyzer
 
 AGENCYBENCH_COMMIT = "ec65324be69e81bd4fe394ef6a86d48b8fa5da56"
 FAMILIES = ["Backend", "Code", "Frontend", "Game", "Research", "MCP"]
