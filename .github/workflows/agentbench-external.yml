@@ -1,0 +1,55 @@
+name: AgentBench External Data Evaluation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/agentbench_external_eval.py'
+      - '.github/workflows/agentbench-external.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agentbench-routing:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout AgentWeave
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned official AgentBench data
+        uses: actions/checkout@v5
+        with:
+          repository: THUDM/AgentBench
+          ref: d1e4a10db08c87075c78972e48ecc182be03e2d5
+          path: external/AgentBench
+          sparse-checkout: |
+            data/dbbench/standard.jsonl
+            data/knowledgegraph/std.json
+            data/os_interaction/data
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install AgentWeave
+        run: pip install -e .
+
+      - name: Evaluate AgentWeave routing on external AgentBench tasks
+        run: |
+          python scripts/agentbench_external_eval.py \
+            --agentbench-root external/AgentBench \
+            --per-domain 200
+          cat agentbench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AgentBench evaluation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentbench-external-routing-evaluation
+          path: |
+            agentbench-routing-results.json
+            agentbench-routing-results.md
