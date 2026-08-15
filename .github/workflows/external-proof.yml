@@ -1,10 +1,12 @@
 name: External Environment Proof
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       run_hosted_a2a:
-        description: Run independently hosted A2A targets from repository secret
+        description: Run independently hosted A2A targets
         required: false
         default: true
         type: boolean
@@ -16,17 +18,25 @@ on:
 
 jobs:
   external-a2a:
-    if: ${{ inputs.run_hosted_a2a }}
+    if: ${{ github.event_name == 'push' || inputs.run_hosted_a2a }}
     runs-on: ubuntu-latest
     env:
       AGENTWEAVE_EXTERNAL_A2A_TARGETS: ${{ secrets.AGENTWEAVE_EXTERNAL_A2A_TARGETS }}
+      AGENTWEAVE_PUBLIC_A2A_TARGETS: >-
+        [{"name":"Bole","agent_card_url":"https://nexus-api-6gxx.onrender.com/.well-known/agent-card.json","implementation":"independently-hosted"},{"name":"Deep Research Archives","agent_card_url":"https://deepresearcharchives.com/.well-known/agent-card.json","implementation":"independently-hosted"},{"name":"Delx","agent_card_url":"https://ontology.delx.ai/.well-known/agent-card.json","implementation":"independently-hosted"}]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
       - run: pip install -e .
-      - run: python scripts/external_a2a_proof.py
+      - name: Select real independently hosted targets
+        run: |
+          if [ -z "$AGENTWEAVE_EXTERNAL_A2A_TARGETS" ]; then
+            echo "AGENTWEAVE_EXTERNAL_A2A_TARGETS=$AGENTWEAVE_PUBLIC_A2A_TARGETS" >> "$GITHUB_ENV"
+          fi
+      - name: Run real external A2A discovery and invocation
+        run: python scripts/external_a2a_proof.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -35,7 +45,7 @@ jobs:
           if-no-files-found: warn
 
   real-marketplaces:
-    if: ${{ inputs.run_marketplaces }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_marketplaces }}
     runs-on: ubuntu-latest
     env:
       AGENTWEAVE_REQUIRE_LIVE_PROOF: '1'
