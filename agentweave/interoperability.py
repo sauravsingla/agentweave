@@ -11,6 +11,9 @@ class InteropTarget:
     agent_card_url: str
     implementation: str='unknown'
     expected_transport: str|None=None
+    rpc_method: str|None=None
+    message: dict|None=None
+    content_type: str|None=None
 
 @dataclass
 class InteropResult:
@@ -34,7 +37,10 @@ class A2AInteropSuite:
             return InteropResult(target.name,target.implementation,False,False,(time.perf_counter()-started)*1000,str(exc))
         transport=str(agent.metadata.get('protocol_binding') or 'JSONRPC')
         try:
-            await self.adapter.invoke(agent,prompt,context={'test':'agentweave-interop','implementation':target.implementation})
+            if target.message is not None:
+                await self.adapter.invoke_message(agent,target.message,rpc_method=target.rpc_method,context={'test':'agentweave-interop','implementation':target.implementation},content_type=target.content_type)
+            else:
+                await self.adapter.invoke(agent,prompt,context={'test':'agentweave-interop','implementation':target.implementation})
             return InteropResult(target.name,target.implementation,True,True,(time.perf_counter()-started)*1000,None,agent.name,transport,bool(agent.metadata.get('streaming')))
         except Exception as exc:
             return InteropResult(target.name,target.implementation,True,False,(time.perf_counter()-started)*1000,str(exc),agent.name,transport,bool(agent.metadata.get('streaming')))
