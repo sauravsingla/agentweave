@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.18)
+project(agentweave_core LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+add_library(agentweave_core STATIC src/agentweave_core.cpp)
+target_include_directories(agentweave_core PUBLIC include)
