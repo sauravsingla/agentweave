@@ -1,75 +1,88 @@
 # AgentWeave
 
-AgentWeave is a domain-agnostic framework for discovering, validating, matching, and orchestrating heterogeneous AI agents across cloud, enterprise, marketplace, and edge environments.
-
-It treats A2A as an interoperability layer and adds the decision layer above it: which agent (or team) should handle a requirement, whether those agents are trustworthy for that requirement, where they should execute, and how performance should update future selection.
-
-## v0.1 capabilities
-
-- Requirement-to-capability decomposition
-- Agent registry and marketplace ingestion
-- Claimed vs validated capabilities
-- Multi-dimensional trust scoring
-- Capability-aware ranking
-- Complementary team formation
-- A2A-style task invocation through pluggable adapters
-- Edge/cloud placement metadata and scoring
-- Outcome evaluation and reputation updates
-- Optional FastAPI service
-- Optional C++ scoring core
-- Unit tests and end-to-end demo
+AgentWeave is a domain-agnostic framework for discovering, validating, selecting, and orchestrating heterogeneous AI agents across cloud, marketplace, enterprise, and edge environments. It treats A2A as an interoperability layer while adding requirement-aware capability matching, trust, team formation, collaboration, result validation, and outcome-driven reputation.
 
 ## Architecture
 
 ```text
-Requirement
-   -> Requirement Analyzer
-   -> Capability Ontology
-   -> Agent Registry <--- Marketplace / A2A / Edge adapters
-   -> Validation + Trust Engine
-   -> Matcher + Team Selector
-   -> A2A Orchestrator
-   -> Result Aggregation
-   -> Outcome / Reputation Update
+Cloud Agents ─┐
+Marketplace ──┼─> Registry -> Validation -> Capability/Knowledge Graph
+Edge LLMs ────┘                         -> Trust Engine
+                                         -> Matching/Ranking
+                                         -> Team Formation
+                                         -> A2A Collaboration
+                                         -> Consensus/Conflict Resolution
+                                         -> Result Validation
+                                         -> Reputation Update
 ```
 
-## Quick start
+## Implemented
+
+- Requirement analysis and capability extraction
+- Agent registry with SQLite persistence
+- Capability and knowledge graph using NetworkX
+- Generic HTTP marketplace adapter plus static marketplace for tests
+- Agent Card discovery over HTTP
+- Security checks and optional JWS verification
+- Benchmark-based capability validation
+- Multi-dimensional trust and outcome history
+- Requirement-to-agent matching and edge/cloud placement scoring
+- Complementary team formation
+- A2A JSON-RPC HTTP transport adapter plus in-memory test adapter
+- Multi-round agent collaboration
+- Consensus detection and arbiter-based conflict resolution
+- Result quality/coverage validation
+- Persistent reputation updates and re-test policy
+- Edge execution adapters for Ollama and llama.cpp
+- Optional C++ ranking/team-selection core for high-throughput workloads
+
+## Install
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-python examples/demo.py
+python -m pip install -e '.[dev,security]'
+pytest
 ```
 
-Tests:
+## Minimal example
 
-```bash
-pip install -e .[dev]
-pytest -q
+```python
+import asyncio
+from agentweave import AgentWeave, AgentProfile, Capability, InMemoryA2AAdapter
+
+async def main():
+    bus = InMemoryA2AAdapter()
+    weave = AgentWeave(a2a=bus, db_path=':memory:')
+
+    agent = AgentProfile('research-1', 'Research Agent', [Capability('research', .9, True)])
+    weave.registry.register(agent)
+    bus.register_handler('research-1', lambda task: {'result': 'evidence-backed finding'})
+
+    result = await weave.solve('Research the topic and summarize evidence', rounds=1)
+    print(result)
+
+asyncio.run(main())
 ```
 
-API:
+## Marketplace and external agents
 
-```bash
-pip install -e .[api]
-uvicorn agentweave.service:app --reload
-```
+`HttpMarketplace` expects an endpoint that returns either a JSON array or `{ "agents": [...] }`. `AgentCardDiscovery` can ingest a remote agent card into an `AgentProfile`. External agents should be validated before sensitive production use.
 
-## Design principles
+## Edge
 
-1. Identity is not competence.
-2. Claimed capability is not validated capability.
-3. Trust is contextual and multi-dimensional.
-4. Complex requirements may need teams, not a single agent.
-5. Edge/cloud placement is part of selection.
-6. Outcome history should improve future routing.
-7. Protocols such as A2A are adapters, not the whole architecture.
+Edge agents can use `OllamaRuntime` or `LlamaCppRuntime`. Set the agent execution location to `edge` and provide the corresponding model metadata. Local-only requirements will exclude non-edge agents.
+
+## Security model
+
+AgentWeave does not equate identity with competence. Identity/signature verification, transport/security posture, benchmarked capability, domain fit, execution reliability, and historical outcomes are kept as separate signals. Newly discovered marketplace agents should be tested with controlled/synthetic data before access to sensitive contexts.
+
+## C++ acceleration
+
+The `cpp/` module provides native scoring and greedy complementary team selection. It is optional; Python remains the control plane and can use the native core where scale/latency requires it.
 
 ## Status
 
-Initial working framework scaffold (v0.1). It is intended for experimentation and extension, not production security certification.
+AgentWeave is an experimental open-source framework. External marketplace schemas, A2A endpoints, identity infrastructures, and edge runtimes vary; adapters are intentionally pluggable. Production deployments should add organization-specific authorization, sandboxing, secrets management, observability, and policy enforcement.
 
 ## License
 
-Apache-2.0.
+Apache-2.0

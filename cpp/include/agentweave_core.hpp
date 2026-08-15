@@ -1,19 +1,17 @@
 #pragma once
 #include <string>
 #include <vector>
+#include <unordered_set>
 
 namespace agentweave {
-
 struct Candidate {
   std::string id;
-  double coverage{0.0};
-  double proficiency{0.0};
-  double validated_ratio{0.0};
-  double trust{0.0};
-  double domain_fit{0.0};
+  std::vector<std::string> capabilities;
+  double proficiency{0.5};
+  double trust{0.5};
+  double placement{0.5};
 };
-
-double score_candidate(const Candidate& c);
-std::vector<Candidate> rank_candidates(std::vector<Candidate> candidates);
-
-} // namespace agentweave
+struct Ranked { std::string id; double score; std::vector<std::string> matched; };
+std::vector<Ranked> rank(const std::vector<std::string>& required,const std::vector<Candidate>& candidates);
+std::vector<std::string> select_team(const std::vector<std::string>& required,const std::vector<Ranked>& ranked,std::size_t max_agents=5);
+}

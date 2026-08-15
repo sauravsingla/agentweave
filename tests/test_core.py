@@ -1,47 +1,48 @@
 import pytest
-from agentweave import AgentWeave, AgentProfile, Capability, ExecutionProfile, StaticMarketplace
-from agentweave.a2a import InMemoryA2AAdapter
-
-
-def test_requirement_and_matching():
-    weave=AgentWeave()
-    a=AgentProfile("a","A",[Capability("research",.9),Capability("analysis",.8)])
-    b=AgentProfile("b","B",[Capability("coding",.95)])
-    weave.validator.validate(a); weave.validator.validate(b)
-    weave.registry.register(a); weave.registry.register(b)
-    req=weave.analyzer.analyze("research and analyze evidence")
-    ranked=weave.matcher.rank(req,weave.registry.all())
-    assert ranked[0].agent.agent_id=="a"
-    assert ranked[0].score>ranked[1].score
-
-
-def test_team_formation_covers_multiple_capabilities():
-    weave=AgentWeave()
-    agents=[AgentProfile("r","R",[Capability("research",.95)]),AgentProfile("a","A",[Capability("analysis",.95)])]
-    for x in agents: weave.validator.validate(x); weave.registry.register(x)
-    req=weave.analyzer.analyze("research and analyze evidence")
-    team=weave.selector.select(req,weave.matcher.rank(req,weave.registry.all()))
-    assert {m.agent.agent_id for m in team}=={"r","a"}
-
-
-def test_local_only_selects_edge():
-    weave=AgentWeave()
-    cloud=AgentProfile("cloud","Cloud",[Capability("vision",.99)])
-    edge=AgentProfile("edge","Edge",[Capability("vision",.8)],execution=ExecutionProfile(location="edge",offline=True))
-    for x in (cloud,edge): weave.validator.validate(x); weave.registry.register(x)
-    req=weave.analyzer.analyze("analyze image offline",local_only=True)
-    ranked=weave.matcher.rank(req,weave.registry.all())
-    assert ranked[0].agent.agent_id=="edge"
-
+from agentweave import AgentWeave, AgentProfile, Capability, TrustVector, ExecutionProfile, InMemoryA2AAdapter, StaticMarketplace, BenchmarkCase
+from agentweave.graph import CapabilityGraph
+from agentweave.validation import ResultValidator, RetestPolicy
 
 @pytest.mark.asyncio
-async def test_end_to_end_and_reputation_update():
-    bus=InMemoryA2AAdapter(); weave=AgentWeave(a2a=bus)
-    agent=AgentProfile("researcher","Researcher",[Capability("research",.95)])
-    weave.ingest_marketplace(StaticMarketplace([agent]))
-    bus.register_handler("researcher",lambda task:{"answer":"ok"})
-    result=await weave.solve("research evidence")
-    assert result["status"]=="completed"
-    assert result["selected_agents"]==["researcher"]
-    assert agent.tasks_completed==1
-    assert agent.tasks_succeeded==1
+async def test_full_flow(tmp_path):
+    bus=InMemoryA2AAdapter(); weave=AgentWeave(bus,tmp_path/'aw.db')
+    a=AgentProfile('a','Researcher',[Capability('research',.95,True)],domains=['science'],knowledge=['evidence'],trust=TrustVector(identity=1,capability=.9,domain=.9,execution=.9,security=.9,collaboration=.8,historical=.8))
+    b=AgentProfile('b','Summarizer',[Capability('summarization',.9,True)],trust=TrustVector(identity=1,capability=.9,domain=.8,execution=.9,security=.9,collaboration=.9,historical=.8))
+    await weave.ingest_marketplace(StaticMarketplace([a,b]))
+    bus.register_handler('a',lambda p:{'result':'evidence','decision':'accept'})
+    bus.register_handler('b',lambda p:{'result':'summary','decision':'accept'})
+    out=await weave.solve('Research the evidence and summarize it',rounds=2)
+    assert out['status']=='completed'
+    assert set(out['selected_agents'])=={'a','b'}
+    assert out['result_validation']['passed']
+    assert out['consensus']['consensus']
+    assert a.tasks_completed==1 and b.tasks_completed==1
+
+@pytest.mark.asyncio
+async def test_benchmark_updates_capability(tmp_path):
+    bus=InMemoryA2AAdapter(); weave=AgentWeave(bus,tmp_path/'aw.db')
+    a=AgentProfile('a','Coder',[Capability('coding',.2,False)])
+    weave.registry.register(a); bus.register_handler('a',lambda p:{'result':'correct'})
+    cases=[BenchmarkCase('coding','write code',lambda r:1.0)]
+    result=await weave.benchmark_agent('a',cases)
+    assert result['passed'] and a.capabilities[0].validated and a.capabilities[0].proficiency==1.0
+
+@pytest.mark.asyncio
+async def test_edge_local_only(tmp_path):
+    bus=InMemoryA2AAdapter(); weave=AgentWeave(bus,tmp_path/'aw.db')
+    cloud=AgentProfile('c','Cloud',[Capability('summarization',1,True)],execution=ExecutionProfile(location='cloud'))
+    edge=AgentProfile('e','Edge',[Capability('summarization',.8,True)],execution=ExecutionProfile(location='edge',privacy_level='local-only'))
+    await weave.ingest_marketplace(StaticMarketplace([cloud,edge])); bus.register_handler('e',lambda p:{'result':'local'})
+    out=await weave.solve('Summarize locally only',local_only=True,rounds=1)
+    assert out['selected_agents']==['e']
+
+def test_graph_and_persistence(tmp_path):
+    weave=AgentWeave(db_path=tmp_path/'aw.db')
+    a=AgentProfile('a','A',[Capability('analysis',.9,True)],knowledge=['graphs'])
+    weave.registry.register(a)
+    assert weave.graph.candidate_agents(weave.analyzer.analyze('analyze this'))==['a']
+    clone=AgentWeave(db_path=tmp_path/'aw.db'); clone.registry.load_persisted(); assert clone.registry.get('a').name=='A'
+
+def test_retest_policy():
+    a=AgentProfile('a','A',[Capability('analysis')])
+    assert RetestPolicy().due(a)
