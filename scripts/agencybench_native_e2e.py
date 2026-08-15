@@ -10,8 +10,8 @@ from typing import Any
 
 from agencybench_external_eval import build_router, load_tasks, visible_query
 
-PRIMARY_MODEL = "qwen2.5-coder:3b"
-FALLBACK_MODEL = "qwen3:4b"
+PRIMARY_MODEL = "llama3.2:3b"
+FALLBACK_MODEL = "granite3.3:2b"
 VISION_MODEL = "qwen3-vl:2b"
 
 
@@ -63,6 +63,7 @@ def _score_summary(meta: Any) -> dict[str, Any]:
     feedback_events = 0
     retry_subtasks = 0
     native_judge_attempts = 0
+    command_successes = 0
     for sub in subtasks:
         if not isinstance(sub, dict):
             continue
@@ -82,6 +83,11 @@ def _score_summary(meta: Any) -> dict[str, Any]:
                 feedback_events += 1
             if "rubric" in attempt or "text_evaluator" in attempt or "vision_evaluator" in attempt or "evaluation" in attempt:
                 native_judge_attempts += 1
+            commands = attempt.get("commands") or {}
+            if isinstance(commands, dict):
+                for value in commands.values():
+                    if isinstance(value, dict) and value.get("returncode") == 0:
+                        command_successes += 1
     return {
         "available": True,
         "subtasks": len(subtasks),
@@ -89,6 +95,7 @@ def _score_summary(meta: Any) -> dict[str, Any]:
         "retry_subtasks": retry_subtasks,
         "feedback_events": feedback_events,
         "native_judge_attempts": native_judge_attempts,
+        "successful_native_commands": command_successes,
         "best_scores": best_scores,
         "mean_best_score": statistics.fmean(best_scores) if best_scores else 0.0,
         "completed_all_subtasks": len(subtasks) >= 5,
@@ -110,6 +117,7 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
             rows.append(row)
     usage = Counter()
     tool_calls = 0
+    tools_offered = 0
     statuses = Counter()
     models = Counter()
     labels = Counter()
@@ -122,6 +130,7 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
             except Exception:
                 pass
         tool_calls += int(row.get("tool_calls") or 0)
+        tools_offered += int(row.get("tools_offered") or 0)
         statuses[str(row.get("status"))] += 1
         if row.get("model"):
             models[str(row["model"])] += 1
@@ -140,6 +149,7 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
         "completion_tokens_reported": usage["completion_tokens"],
         "total_tokens_reported": usage["total_tokens"],
         "tool_calls_reported": tool_calls,
+        "tools_offered_across_requests": tools_offered,
         "upstream_request_wall_seconds": wall_ms / 1000.0,
         "monetary_cost_usd": 0.0,
         "cost_note": "Models execute locally in Ollama on the GitHub-hosted runner, so there is no external per-token API charge in this proof. Runner/computing opportunity cost is not converted into a fabricated dollar amount.",
@@ -192,6 +202,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
         "|---|---:|",
         f"| Backend primary native subtasks | {primary.get('subtasks', 0)} |",
         f"| Backend primary mean best score | {primary.get('mean_best_score', 0.0):.2f}/10 |",
+        f"| Backend primary successful native commands | {primary.get('successful_native_commands', 0)} |",
         f"| Backend native retry subtasks | {primary.get('retry_subtasks', 0)} |",
         f"| Backend native feedback events | {primary.get('feedback_events', 0)} |",
         f"| Recovery alternate agent executed | {'yes' if recovery_triggered else 'no'} |",

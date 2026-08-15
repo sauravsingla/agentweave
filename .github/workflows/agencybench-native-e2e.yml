@@ -17,8 +17,8 @@ jobs:
     timeout-minutes: 60
     env:
       AGENCYBENCH_PIN: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
-      PRIMARY_MODEL: qwen3:1.7b
-      FALLBACK_MODEL: qwen2.5-coder:1.5b
+      PRIMARY_MODEL: llama3.2:3b
+      FALLBACK_MODEL: granite3.3:2b
       VISION_MODEL: qwen3-vl:2b
     steps:
       - name: Checkout AgentWeave
@@ -58,16 +58,13 @@ jobs:
           assert 'enable_data_upload' in signature(SiiAgentOptions).parameters
           print('SII SDK compatibility verified')
           PY
-          # Official SII Agent SDK documentation requires the globally installed
-          # @gair/sii-cli package to provide the Node.js bridge.
           node --version
           npm --version
           npm install --global @gair/sii-cli
           command -v sii
           sii --version
-          npm root --global
 
-      - name: Install Ollama and pull open models
+      - name: Install Ollama and pull tool-capable open models
         shell: bash
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
@@ -91,13 +88,30 @@ jobs:
           sleep 2
           curl -fsS http://127.0.0.1:8911/models >/dev/null
 
-      - name: Prove live local model inference
+      - name: Prove native OpenAI-compatible tool calling
         run: |
-          curl --fail --silent --show-error http://127.0.0.1:8911/chat/completions \
-            -H 'Content-Type: application/json' \
-            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":80}" \
-            | tee native-e2e-meter/model-smoke.json
-          grep -q 'AGENCYBENCH_MODEL_READY' native-e2e-meter/model-smoke.json
+          python - <<'PY'
+          import os, httpx
+          tools=[{"type":"function","function":{"name":"list_directory","description":"List the current directory","parameters":{"type":"object","properties":{}}}}]
+          for model in (os.environ['PRIMARY_MODEL'], os.environ['FALLBACK_MODEL']):
+              payload={
+                  "model": model,
+                  "messages":[
+                      {"role":"system","content":"You have a real callable tool. Use the tool now; do not describe or simulate a call in text."},
+                      {"role":"user","content":"Call list_directory to inspect the workspace."},
+                  ],
+                  "tools": tools,
+                  "temperature": 0,
+                  "max_tokens": 96,
+              }
+              r=httpx.post('http://127.0.0.1:8911/chat/completions',json=payload,timeout=180)
+              r.raise_for_status()
+              data=r.json()
+              calls=((data.get('choices') or [{}])[0].get('message') or {}).get('tool_calls') or []
+              assert calls, (model, data)
+              assert calls[0].get('function',{}).get('name') == 'list_directory', (model, calls)
+              print(model, 'native tool calling verified')
+          PY
 
       - name: Route full Backend scenario with AgentWeave
         run: |
@@ -115,22 +129,22 @@ jobs:
           FAMILY=$(python -c "import json; print(json.load(open('agencybench-native-route.json'))['selected_family'])")
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
-          MAX_SUBTASK_ATTEMPTS=2
+          MAX_SUBTASK_ATTEMPTS=1
           BRIDGE_TIMEOUT_MS=180000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously in the workspace. Use shell and file tools, implement the requested software, compile and test it, preserve earlier subtask work, and repair failures using evaluator feedback. Prefer direct implementation over explanation.
-          SII_MAX_TURNS=8
+          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. You have real shell and file tools. You MUST use actual function/tool calls to inspect and modify the current workspace. Start with list_directory, then use write_file or replace and run_shell_command to implement, compile, and test the requested C++17 software. Never print JSON pretending to call a tool and never say the task is complete until files were written and tests were run.
+          SII_MAX_TURNS=6
           EOF
           START=$(date +%s)
           (cd "$DIR" && timeout 900s python eval_task.py --env .env.agentweave --description description.json) 2>&1 | tee "$ROOT/backend-primary.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/backend-primary.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/backend-primary.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_1.7b' | head -1)
-          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
-          [ -n "$META" ] && cp "$META" "$ROOT/backend-primary-meta.json"
+          MODEL_DIR="${PRIMARY_MODEL//:/_}"
+          META="$DIR/$MODEL_DIR/meta_eval.json"
+          [ -s "$META" ] && cp "$META" "$ROOT/backend-primary-meta.json"
           exit 0
 
       - name: Recovery and re-routing with alternate agent
@@ -152,22 +166,22 @@ jobs:
           FAMILY=$(python -c "import json; print(json.load(open('agencybench-native-route.json'))['selected_family'])")
           cat > "$DIR/.env.agentweave-fallback" <<EOF
           CONDA_ENV_NAME=
-          MAX_SUBTASK_ATTEMPTS=2
+          MAX_SUBTASK_ATTEMPTS=1
           BRIDGE_TIMEOUT_MS=180000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${FALLBACK_MODEL}
-          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected after the first agent failed the native AgencyBench threshold. Use shell and file tools, compile and test every deliverable, and repair failures using the native evaluator feedback.
-          SII_MAX_TURNS=8
+          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected after the first agent missed the native AgencyBench threshold. You have real shell and file tools. Use actual function/tool calls, beginning with list_directory. Modify the workspace using write_file or replace, then compile and test with run_shell_command. Do not output a simulated tool-call JSON object.
+          SII_MAX_TURNS=6
           EOF
           START=$(date +%s)
-          (cd "$DIR" && timeout 600s python eval_task.py --env .env.agentweave-fallback --description description.json) 2>&1 | tee "$ROOT/backend-fallback.log"
+          (cd "$DIR" && timeout 900s python eval_task.py --env .env.agentweave-fallback --description description.json) 2>&1 | tee "$ROOT/backend-fallback.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/backend-fallback.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/backend-fallback.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen2.5-coder_1.5b' | head -1)
-          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
-          [ -n "$META" ] && cp "$META" "$ROOT/backend-fallback-meta.json"
+          MODEL_DIR="${FALLBACK_MODEL//:/_}"
+          META="$DIR/$MODEL_DIR/meta_eval.json"
+          [ -s "$META" ] && cp "$META" "$ROOT/backend-fallback-meta.json"
           exit 0
 
       - name: Start official AgencyBench Docker sandbox
@@ -208,8 +222,8 @@ jobs:
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable with the available tools and repair it using evaluator feedback.
-          SII_MAX_TURNS=8
+          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Use real browser, shell, and file tool calls to build the requested deliverable in the current workspace. Do not simulate tool calls in text. Repair the deliverable after native evaluator feedback.
+          SII_MAX_TURNS=6
           EVAL_TEXT_API_KEY=ollama-local
           EVAL_TEXT_API_BASE_URL=http://127.0.0.1:8912/v1
           EVAL_TEXT_MODEL=${FALLBACK_MODEL}
@@ -219,12 +233,12 @@ jobs:
           QWEN_VISION_API_KEY=ollama-local
           EOF
           START=$(date +%s)
-          (cd "$DIR" && timeout 600s python eval_task.py --env .env.agentweave) 2>&1 | tee "$ROOT/frontend-native.log"
+          (cd "$DIR" && timeout 900s python eval_task.py --env .env.agentweave) 2>&1 | tee "$ROOT/frontend-native.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/frontend-native.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/frontend-native.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_1.7b' | head -1)
-          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
-          [ -n "$META" ] && cp "$META" "$ROOT/frontend-native-meta.json"
+          MODEL_DIR="${PRIMARY_MODEL//:/_}"
+          META="$DIR/$MODEL_DIR/meta_eval.json"
+          [ -s "$META" ] && cp "$META" "$ROOT/frontend-native-meta.json"
           cp "$ROOT/frontend-description-original.json" "$DIR/description.json"
           exit 0
 
@@ -250,13 +264,17 @@ jobs:
           test -s backend-primary-meta.json
           test -s frontend-native-meta.json
           python - <<'PY'
-          import json
+          import json, pathlib
           r=json.load(open('agencybench-native-e2e-results.json'))
           assert r['backend_primary']['subtasks'] == 5, r
+          assert r['backend_primary']['native_judge_attempts'] >= 5, r
           assert r['frontend_docker_native_judge']['subtasks'] >= 1, r
-          assert r['metering']['model_requests'] > 1, r
+          assert r['metering']['model_requests'] > 2, r
           assert r['metering']['total_tokens_reported'] > 0, r
-          print('Native AgencyBench long-horizon, feedback/recovery, Docker/judges and metering evidence present.')
+          assert r['metering']['tool_calls_reported'] > 0, r
+          if pathlib.Path('backend-recovery-triggered.txt').read_text().strip() == 'yes':
+              assert r['backend_fallback']['subtasks'] == 5, r
+          print('Native AgencyBench long-horizon, recovery, Docker/judges, real tool calls and metering evidence present.')
           PY
 
       - name: Upload native evidence

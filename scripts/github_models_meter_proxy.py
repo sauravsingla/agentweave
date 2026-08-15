@@ -113,6 +113,7 @@ def make_handler(meter: Meter, upstream: str, token: str | None, model_ids: list
             request_json = _json_or_none(body)
             model = request_json.get("model") if isinstance(request_json, dict) else None
             stream = bool(request_json.get("stream")) if isinstance(request_json, dict) else False
+            tools_offered = len(request_json.get("tools") or []) if isinstance(request_json, dict) else 0
             headers = {
                 "Accept": self.headers.get("Accept", "application/json"),
                 "Content-Type": self.headers.get("Content-Type", "application/json"),
@@ -164,6 +165,7 @@ def make_handler(meter: Meter, upstream: str, token: str | None, model_ids: list
                 "wall_ms": round(wall_ms, 3),
                 "request_bytes": len(body),
                 "response_bytes": len(out),
+                "tools_offered": tools_offered,
                 "usage": usage,
                 "tool_calls": tool_calls,
                 "error_preview": out.decode("utf-8", errors="ignore")[:300] if status >= 400 else None,
@@ -178,7 +180,7 @@ def main() -> None:
     p.add_argument("--label", required=True)
     p.add_argument("--log", required=True)
     p.add_argument("--upstream", default="http://127.0.0.1:11434/v1")
-    p.add_argument("--models", default="qwen2.5-coder:3b,qwen3:4b,qwen3-vl:2b")
+    p.add_argument("--models", default="llama3.2:3b,granite3.3:2b,qwen3-vl:2b")
     p.add_argument("--token-env")
     p.add_argument("--github-headers", action="store_true")
     args = p.parse_args()
