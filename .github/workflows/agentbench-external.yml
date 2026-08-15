@@ -7,6 +7,7 @@ on:
       - 'agentweave/requirements.py'
       - 'scripts/agentbench_external_eval.py'
       - 'scripts/agentbench_blind_eval.py'
+      - 'scripts/agentbench_selective_eval.py'
       - '.github/workflows/agentbench-external.yml'
   workflow_dispatch:
 
@@ -55,6 +56,13 @@ jobs:
             --per-domain 200
           cat agentbench-blind-results.md >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Evaluate confidence-aware selective routing
+        run: |
+          python scripts/agentbench_selective_eval.py \
+            --agentbench-root external/AgentBench \
+            --per-domain 200
+          cat agentbench-selective-results.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload AgentBench evaluation evidence
         uses: actions/upload-artifact@v4
         with:
@@ -64,3 +72,5 @@ jobs:
             agentbench-routing-results.md
             agentbench-blind-results.json
             agentbench-blind-results.md
+            agentbench-selective-results.json
+            agentbench-selective-results.md
