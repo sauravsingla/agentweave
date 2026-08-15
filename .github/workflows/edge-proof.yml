@@ -1,0 +1,44 @@
+name: Real Edge Hardware Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime:
+        description: ollama or llama.cpp
+        required: true
+        default: ollama
+        type: choice
+        options: [ollama, llama.cpp]
+      ollama_model:
+        description: Ollama model already installed on the edge runner
+        required: false
+        default: llama3.2:1b
+        type: string
+      llama_cpp_model:
+        description: Absolute model path for llama.cpp runner
+        required: false
+        type: string
+
+jobs:
+  real-edge:
+    runs-on: [self-hosted, agentweave-edge]
+    timeout-minutes: 30
+    env:
+      AGENTWEAVE_REQUIRE_LIVE_PROOF: '1'
+      AGENTWEAVE_EDGE_RUNTIME: ${{ inputs.runtime }}
+      OLLAMA_MODEL: ${{ inputs.ollama_model }}
+      LLAMA_CPP_MODEL: ${{ inputs.llama_cpp_model }}
+      EDGE_PROOF_ITERATIONS: '5'
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -e '.[edge]'
+      - name: Validate edge runtime and collect device telemetry
+        run: python scripts/production_proof.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-edge-hardware-proof
+          path: proof-results.json

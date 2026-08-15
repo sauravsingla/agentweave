@@ -30,25 +30,21 @@ Cloud / Marketplace / Enterprise / Edge Agents
        Reputation + Dynamic Retesting
 ```
 
-## What is implemented
+## Implemented
 
-- Live A2A endpoint interoperability harness and official `a2aproject/a2a-tck` workflow integration.
-- A2A Agent Card discovery and JSON-RPC / HTTP+JSON clients, plus long-running streaming, retry, cancel and resume lifecycle helpers.
-- Ecosystem connectors for Amazon Bedrock agents, Microsoft Foundry Agents, Google Cloud Marketplace A2A Agent Cards, curated A2A catalogs, and generic HTTP catalogs.
-- Benchmark-based capability validation and dynamic re-testing.
-- Composite result validation plus semantic consistency, contradiction, uncertainty, citation/evidence and verifier-agent hooks.
-- DID resolution (`did:web` plus universal-resolver adapter), JWT Verifiable Credential verification, revocation, certificate rotation, external KMS/HSM hooks, and workload/hardware attestation hooks.
-- Container sandboxing with Docker (`cap-drop=ALL`, no-new-privileges, read-only root, network isolation, memory/CPU/PID limits, tmpfs and secret allow-listing) plus Bubblewrap support.
-- Ontology-aware knowledge/capability graph with aliases, inheritance, semantic similarity and freshness decay.
-- Global team optimization over coverage, trust, diversity, redundancy, latency, cost and communication overhead.
-- SQLite development storage and transactional PostgreSQL registry/reputation storage with audit history and optional write-through replicas.
-- Synthetic 10K/100K/1M-agent scalability benchmark harness, C++/Python routing comparison hooks and research-baseline evaluation.
-- Adversarial tests for lying Agent Cards, prompt-injection strings, Sybil groups, reputation poisoning, timeouts and Byzantine disagreement.
-- Edge runtime adapters for Ollama and llama.cpp plus hardware telemetry/test harness for CPU, memory, NVIDIA GPU, thermal data and reconnect/offline simulation.
-- Structured logging, metrics, OpenTelemetry-compatible tracing and audit trails.
-- Governance policy engine for jurisdiction, data residency, tool authorization, locality, risk tiers and human approval.
-- CLI, JSON/YAML configuration, plugin entry points and stable SDK facade.
-- Optional pybind11 C++ native ranking acceleration with CI import/execution tests.
+AgentWeave includes A2A Agent Card discovery and JSON-RPC/HTTP+JSON clients, multi-round collaboration, consensus/conflict handling, semantic result verification, benchmark-based capability validation, DID/VC and signature hooks, security validation, Docker/Bubblewrap sandboxing, ontology-aware capability/knowledge graphs, global team optimization, PostgreSQL/SQLite reputation storage, observability, governance, edge runtimes, marketplace connectors, and optional C++/pybind11 acceleration.
+
+The repository also contains live cross-SDK A2A interoperability CI. Python, Go, JavaScript and Java upstream A2A SDK agents are launched independently and AgentWeave discovers and invokes each of them.
+
+## Deep proof suite
+
+Version 0.5 adds reproducible proof infrastructure for the five remaining maturity areas:
+
+1. **Full A2A lifecycle + TCK conformance** — `LongRunningA2AClient` supports SendMessage, SendStreamingMessage, GetTask, ListTasks, CancelTask and resumable polling for JSON-RPC and HTTP+JSON. `agentweave.a2a_server` is an AgentWeave A2A System Under Test built with the official Python A2A SDK. CI launches it and runs the official Linux Foundation `a2aproject/a2a-tck` MUST-level JSON-RPC suite.
+2. **Adversarial/security + sandbox validation** — deterministic prompt-injection/Sybil fixtures plus active Docker isolation tests for read-only root filesystem, writable tmpfs, disabled network, secret isolation, PID, CPU and memory limits.
+3. **10K/100K/1M scalability + C++ benchmarks** — `ScaleSuite` physically evaluates the requested population using bounded-memory batches and compares Python against the native C++ matcher when the pybind11 module is available. The 10K proof runs in normal CI; the 10K/100K/1M physical run is available from the Deep Proof workflow.
+4. **Research baselines + ablations** — reproducible comparisons against random routing, single-best, trust-only and capability-greedy baselines, plus no-trust and no-placement ablations. Reports include per-case metrics, aggregate coverage/score/trust/latency/cost/team-size and bootstrap confidence intervals.
+5. **Real deployment proof** — PostgreSQL is exercised in CI using a real PostgreSQL service with agent and outcome round-trips. AWS Bedrock, Microsoft Foundry and Google Cloud Marketplace proof jobs use real credentials/card URLs when configured. Real edge proof runs on a self-hosted `agentweave-edge` runner against an installed Ollama or llama.cpp runtime and records hardware/runtime telemetry.
 
 ## Install
 
@@ -57,82 +53,71 @@ python -m pip install -e '.[dev]'
 pytest -q
 ```
 
+For the A2A conformance SUT:
+
+```bash
+python -m pip install -e '.[tck]'
+agentweave-a2a-sut
+```
+
 Optional production integrations:
 
 ```bash
 python -m pip install -e '.[security,postgres,aws,observability,edge,yaml,native]'
 ```
 
-## Minimal example
+## A2A interoperability and lifecycle
+
+The **A2A SDK Interoperability Proof** workflow launches independent upstream Python, Go, JavaScript and Java A2A implementations and produces a compatibility-matrix artifact. The **AgentWeave Deep Proof** workflow additionally starts the AgentWeave A2A SUT, exercises normal and streaming lifecycle operations, then runs the official TCK against it.
+
+The lifecycle client can also be used directly:
 
 ```python
-import asyncio
-from agentweave import AgentWeave, AgentProfile, Capability, InMemoryA2AAdapter
+from agentweave import AgentCardDiscovery, LongRunningA2AClient
 
-async def main():
-    bus = InMemoryA2AAdapter()
-    weave = AgentWeave(a2a=bus, db_path=':memory:')
-    agent = AgentProfile('research-1', 'Research Agent', [Capability('research', .9, True)])
-    weave.register(agent)
-    bus.register_handler('research-1', lambda task: {'result': 'evidence-backed finding', 'decision': 'accept'})
-    result = await weave.solve('Research the topic', rounds=1, semantic_verify=True)
-    print(result)
-
-asyncio.run(main())
+agent = await AgentCardDiscovery().fetch('https://agent.example/.well-known/agent-card.json')
+client = LongRunningA2AClient()
+state = await client.send(agent, 'research this topic')
+async for event in client.stream(agent, 'stream progress'):
+    print(event)
 ```
 
-## Live A2A interoperability
-
-The repository contains a manual GitHub Actions workflow, **Live A2A Interoperability**, that accepts multiple independent A2A Agent Card URLs. It performs discovery and invocation against each target. An optional `sut_host` input also clones and runs the official Linux Foundation A2A TCK MUST-level conformance suite.
-
-Locally:
+## Security proof
 
 ```bash
-export AGENTWEAVE_A2A_TARGETS='[
-  {"name":"python-agent","agent_card_url":"https://host-a/.well-known/agent-card.json","implementation":"a2a-python"},
-  {"name":"java-agent","agent_card_url":"https://host-b/.well-known/agent-card.json","implementation":"a2a-java"}
-]'
-python scripts/live_interop.py
+python scripts/security_proof.py
 ```
 
-The official A2A sample project contains implementations in Python, Go, Java, JavaScript and .NET; these are suitable targets for a multi-language interoperability lab. AgentWeave intentionally does not hard-code public demo endpoints because those endpoints are not guaranteed to remain available.
+This actively runs sandbox attack cases when Docker is available. A passing security proof means the tested controls behaved as configured on that runtime; it is not a formal security certification.
 
-## Marketplace connectors
+## Research evaluation
 
-`AWSBedrockAgentConnector` lists agents in an authenticated AWS account. `MicrosoftFoundryAgentConnector` uses the Foundry Agents REST API. `GoogleCloudMarketplaceA2AConnector` loads procured Google Cloud Marketplace A2A Agent Cards; Google Cloud's A2A marketplace flow exposes the Agent Card associated with a procured agent rather than a universal unauthenticated agent-catalog API.
+```bash
+python scripts/research_evaluation.py
+```
 
-## Sandboxing
+The generated `research-evaluation.json` contains baseline and ablation rows, aggregate metrics and a bootstrap 95% confidence interval for AgentWeave's coverage delta versus the single-best baseline.
 
-Use `DockerSandbox` for untrusted code execution. Images should be digest pinned and optionally allow-listed via `SandboxPolicy`. Sandbox execution is an OS-level control, but production deployments should still use hardened container runtimes/VMs, image signing, network policy and host security appropriate to their threat model.
+## Scalability
 
-## PostgreSQL
+```bash
+PYTHONPATH=cpp/build python scripts/scale_suite.py --sizes 10000,100000,1000000
+```
+
+The reported `physical_agents_evaluated` field equals the requested population. Batching bounds memory without relabeling smaller runs as larger ones.
+
+## PostgreSQL and live deployments
 
 ```python
-from agentweave import AgentWeave, PostgresReputationStore
+from agentweave import PostgresReputationStore
 store = PostgresReputationStore('postgresql://user:pass@host/db')
-weave = AgentWeave(store=store)
 ```
 
-The PostgreSQL backend uses transactions, versioned agent records, indexed outcome history and an append-only audit table. `ReplicatedStore` supports write-through replicas.
-
-## Scalability benchmark
-
-```bash
-python scripts/scale_benchmark.py --sizes 10000,100000,1000000
-```
-
-For constrained CI or development machines, use `--cap` to execute a smaller physical population while preserving requested-size labels. Do not publish capped results as million-agent measurements.
-
-## CLI
-
-```bash
-agentweave agents
-agentweave --config agentweave.json solve "Research and verify this topic"
-```
+`PostgresDeploymentProof` verifies registry persistence plus outcome/audit writes. `MarketplaceDeploymentProof` executes AWS Bedrock, Microsoft Foundry and Google Cloud A2A marketplace connectors when their environment configuration is present. `EdgeDeploymentProof` invokes a real Ollama or llama.cpp model and records latency, memory, CPU, GPU and thermal telemetry where available.
 
 ## Production boundary
 
-AgentWeave now contains implementations for each major architectural layer, but external-service and hardware capabilities require the corresponding credentials, services, runtimes or devices. A connector existing in code is not evidence that a specific marketplace account, remote A2A server, TPM/TEE, Jetson/Raspberry Pi, PostgreSQL cluster or container runtime has been exercised. Keep live interoperability, adversarial, scale and hardware results separate from unit-test claims.
+The repository distinguishes **implemented test harnesses** from **executed external proof**. PostgreSQL, Docker, A2A SDK interoperability and CI-based conformance can be exercised on GitHub-hosted runners. Marketplace proof requires valid cloud credentials/procured Agent Card URLs, and real edge proof requires a registered self-hosted hardware runner with the selected model/runtime installed. The workflow fails rather than claiming a live proof when a required live target is not configured.
 
 ## License
 

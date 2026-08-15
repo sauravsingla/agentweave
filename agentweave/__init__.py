@@ -19,6 +19,9 @@ from .lifecycle import LongRunningA2AClient, TaskState, TaskStateStore
 from .observability import Observability, StructuredLogger, Metrics, Tracer, AuditTrail
 from .policy import GovernancePolicyEngine, PolicyContext, PolicyDecision
 from .benchmarks import SyntheticAgentFactory, ScalabilityBenchmark, AdversarialAgent, AdversarialTestSuite, ResearchEvaluationSuite
+from .research import ResearchBenchmark, EvaluationRow, ScaleSuite
+from .security_lab import SandboxValidationSuite, AdversarialValidationSuite, SecurityProof
+from .proof import MarketplaceDeploymentProof, EdgeDeploymentProof, PostgresDeploymentProof, ProofResult, run_all_proofs
 from .sdk import AgentWeaveConfig, PluginManager, AgentWeaveSDK
 from .native import NativeAcceleration
 from .orchestrator import AgentWeave
