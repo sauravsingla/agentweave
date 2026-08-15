@@ -74,25 +74,19 @@ jobs:
           SRC := src/main.cpp
 
           .PHONY: all task1 task2 task3 task4 task5 run_task1 test_queue clean
-
           all: task5
-
           $(TARGET): $(SRC)
           	mkdir -p bin data logs
           	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
-
           task1: $(TARGET)
           task2: $(TARGET)
           task3: $(TARGET)
           task4: $(TARGET)
           task5: $(TARGET)
-
           run_task1: task1
           	./$(TARGET)
-
           test_queue: task5
           	./$(TARGET) --selftest concurrency
-
           clean:
           	rm -f $(TARGET)
           MAKE
@@ -105,121 +99,69 @@ jobs:
           #include <iostream>
           #include <mutex>
           #include <queue>
-          #include <sstream>
           #include <string>
           #include <thread>
-          #include <vector>
-
           namespace fs = std::filesystem;
-
-          static void ensure_dirs() {
-              fs::create_directories("data");
-              fs::create_directories("logs");
+          static void ensure_dirs(){ fs::create_directories("data"); fs::create_directories("logs"); }
+          static void append_line(const std::string& p,const std::string& s){ std::ofstream o(p,std::ios::app); o<<s<<"\n"; }
+          static bool contains_ci(std::string a,std::string b){
+            std::transform(a.begin(),a.end(),a.begin(),[](unsigned char c){return std::tolower(c);});
+            std::transform(b.begin(),b.end(),b.begin(),[](unsigned char c){return std::tolower(c);});
+            return a.find(b)!=std::string::npos;
           }
-
-          static void append_line(const std::string& path, const std::string& line) {
-              std::ofstream out(path, std::ios::app);
-              out << line << "\n";
+          static int selftest(const std::string& n){
+            ensure_dirs();
+            if(n=="friend-menu"){
+              append_line("data/friends.json","{\"friend\":\"alice\",\"status\":\"online\"}");
+              std::cout<<"Friends\n1. List friends\n2. Add friend\n3. Remove friend\n4. Chat\nPASS friend-menu\n"; return 0;
+            }
+            if(n=="chat-loop"){
+              append_line("logs/chat_history.log","alice|bob|hello");
+              std::cout<<"Chat with alice\nHistory\nhello\nPASS chat-loop\n"; return 0;
+            }
+            if(n=="alias-search"){
+              append_line("data/aliases.json","{\"alice\":\"ally\"}");
+              if(!contains_ci("hello from ally","ally")) return 2;
+              std::cout<<"Alias: ally\nSearch results: [ally] hello from ally\nPASS alias-search\n"; return 0;
+            }
+            if(n=="concurrency"){
+              std::queue<int> q; std::mutex m;
+              auto producer=[&](){ for(int i=0;i<100;i++){ std::lock_guard<std::mutex> g(m); q.push(i); } };
+              std::thread a(producer),b(producer); a.join(); b.join();
+              if(q.size()!=200) return 3;
+              append_line("logs/chat_history.log","concurrency|messages=200");
+              std::cout<<"queue_size=200\nPASS concurrency\n"; return 0;
+            }
+            return 64;
           }
-
-          static bool contains_ci(std::string text, std::string needle) {
-              std::transform(text.begin(), text.end(), text.begin(), [](unsigned char c){ return std::tolower(c); });
-              std::transform(needle.begin(), needle.end(), needle.begin(), [](unsigned char c){ return std::tolower(c); });
-              return text.find(needle) != std::string::npos;
+          static void menu(){
+            ensure_dirs();
+            std::cout<<"AgentWeave Chat App v1.0.0\n1. Register\n2. Login\n3. Friends\n4. Chat\n5. Search\n6. Exit\n";
+            std::string line;
+            while(std::getline(std::cin,line)){
+              if(line=="1"){
+                std::string u,p; std::cout<<"Username: "; std::getline(std::cin,u); std::cout<<"Password: "; std::getline(std::cin,p);
+                append_line("data/users.json","{\"username\":\""+u+"\",\"password\":\"sha256-salted\"}"); std::cout<<"Registration successful\n";
+              } else if(line=="2"){
+                std::string u,p; std::cout<<"Username: "; std::getline(std::cin,u); std::cout<<"Password: "; std::getline(std::cin,p);
+                append_line("logs/session_state.json","{\"user\":\""+u+"\",\"logged_in\":true}"); std::cout<<"Login successful\n";
+              } else if(line=="3") std::cout<<"Friends\n1. List friends\n2. Add friend\n3. Remove friend\n4. Chat\n";
+              else if(line=="4"){ std::cout<<"Chat\nEnter friend: "; std::string w; std::getline(std::cin,w); std::cout<<"Chat with "<<w<<"\n"; }
+              else if(line=="5"){ std::cout<<"Search: "; std::string q; std::getline(std::cin,q); std::cout<<"Search results for ["<<q<<"]\n"; }
+              else if(line=="6"||line=="exit"||line=="quit") break;
+            }
           }
-
-          static int selftest(const std::string& name) {
-              ensure_dirs();
-              if (name == "friend-menu") {
-                  append_line("data/friends.json", "{\"friend\":\"alice\",\"status\":\"online\"}");
-                  std::cout << "Friends\n1. List friends\n2. Add friend\n3. Remove friend\n4. Chat\nPASS friend-menu\n";
-                  return 0;
-              }
-              if (name == "chat-loop") {
-                  append_line("logs/chat_history.log", "alice|bob|hello");
-                  std::cout << "Chat with alice\nHistory\nhello\nPASS chat-loop\n";
-                  return 0;
-              }
-              if (name == "alias-search") {
-                  append_line("data/aliases.json", "{\"alice\":\"ally\"}");
-                  const std::string sample = "hello from ally";
-                  if (!contains_ci(sample, "ally")) return 2;
-                  std::cout << "Alias: ally\nSearch results: [ally] hello from ally\nPASS alias-search\n";
-                  return 0;
-              }
-              if (name == "concurrency") {
-                  std::queue<int> q;
-                  std::mutex m;
-                  auto producer = [&]() {
-                      for (int i=0;i<100;i++) {
-                          std::lock_guard<std::mutex> lock(m);
-                          q.push(i);
-                      }
-                  };
-                  std::thread a(producer), b(producer);
-                  a.join(); b.join();
-                  if (q.size() != 200) return 3;
-                  append_line("logs/chat_history.log", "concurrency|messages=200");
-                  std::cout << "queue_size=200\nPASS concurrency\n";
-                  return 0;
-              }
-              std::cerr << "Unknown selftest: " << name << "\n";
-              return 64;
-          }
-
-          static void menu() {
-              ensure_dirs();
-              std::cout << "AgentWeave Chat App v1.0.0\n";
-              std::cout << "1. Register\n2. Login\n3. Friends\n4. Chat\n5. Search\n6. Exit\n";
-              std::string line;
-              while (std::getline(std::cin, line)) {
-                  if (line == "1") {
-                      std::string user, pass;
-                      std::cout << "Username: "; std::getline(std::cin, user);
-                      std::cout << "Password: "; std::getline(std::cin, pass);
-                      append_line("data/users.json", "{\"username\":\"" + user + "\",\"password\":\"sha256-salted\"}");
-                      std::cout << "Registration successful\n";
-                  } else if (line == "2") {
-                      std::string user, pass;
-                      std::cout << "Username: "; std::getline(std::cin, user);
-                      std::cout << "Password: "; std::getline(std::cin, pass);
-                      append_line("logs/session_state.json", "{\"user\":\"" + user + "\",\"logged_in\":true}");
-                      std::cout << "Login successful\n";
-                  } else if (line == "3") {
-                      std::cout << "Friends\n1. List friends\n2. Add friend\n3. Remove friend\n4. Chat\n";
-                  } else if (line == "4") {
-                      std::cout << "Chat\nEnter friend: ";
-                      std::string who; std::getline(std::cin, who);
-                      std::cout << "Chat with " << who << "\n";
-                  } else if (line == "5") {
-                      std::cout << "Search: ";
-                      std::string q; std::getline(std::cin, q);
-                      std::cout << "Search results for [" << q << "]\n";
-                  } else if (line == "6" || line == "exit" || line == "quit") {
-                      break;
-                  }
-              }
-          }
-
-          int main(int argc, char** argv) {
-              if (argc == 2 && std::string(argv[1]) == "--version") {
-                  std::cout << "1.0.0\n";
-                  return 0;
-              }
-              if (argc == 3 && std::string(argv[1]) == "--selftest") {
-                  return selftest(argv[2]);
-              }
-              menu();
-              return 0;
+          int main(int argc,char** argv){
+            if(argc==2 && std::string(argv[1])=="--version"){ std::cout<<"1.0.0\n"; return 0; }
+            if(argc==3 && std::string(argv[1])=="--selftest") return selftest(argv[2]);
+            menu(); return 0;
           }
           CPP
 
           cat > native-workspace/tests/README.md <<'EOF'
-          This workspace is a deterministic conformance fixture used only to prove that the pinned
-          AgencyBench native evaluator executes the five Backend/scenario1 contracts correctly.
-          It is not reported as an LLM task-completion score.
+          Deterministic conformance fixture for the pinned AgencyBench Backend/scenario1 native evaluator.
+          It proves evaluator wiring and contract execution; it is not reported as an LLM task-completion score.
           EOF
-
           find native-workspace -maxdepth 3 -type f -printf '%P\n' | sort | tee backend-native-workspace-files.txt
 
       - name: Enforce exact local acceptance contract before native evaluation
@@ -251,10 +193,18 @@ jobs:
           DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Backend/scenario1"
           MODEL_DIR="$NATIVE_MODEL_ID"
 
+          # EnvConfig validates agent credentials even in --eval-only mode.
+          # These placeholders satisfy config parsing; eval-only does not invoke an agent.
           cat > "$DIR/.env.agentweave-native" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=1
           SII_TARGET_MODEL=${NATIVE_MODEL_ID}
+          SII_AGENT_API_KEY=eval-only-placeholder
+          SII_AGENT_API_BASE_URL=http://127.0.0.1:1/v1
+          SII_AUTH_TYPE=USE_OPENAI
+          SII_SYSTEM_PROMPT=
+          SII_MAX_TURNS=1
+          BRIDGE_TIMEOUT_MS=1000
           EOF
 
           rm -f "$DIR/$MODEL_DIR/meta_eval.json"
@@ -276,32 +226,39 @@ jobs:
           python - <<'PY'
           import json
           from pathlib import Path
-
           route=json.load(open('agencybench-native-route.json'))
           meta=json.load(open('backend-native-meta.json'))
-          subtasks=meta.get('subtasks', [])
+          subtasks=meta.get('subtasks',[])
           scores=[float(x.get('best_score') or 0) for x in subtasks]
           attempts=sum(len(x.get('attempts') or []) for x in subtasks)
-          mean=(sum(scores)/len(scores)) if scores else 0.0
-          passed=sum(1 for s in scores if s > 0)
+          mean=sum(scores)/len(scores) if scores else 0.0
+          passed=sum(s>0 for s in scores)
           result={
-              'proof_mode':'deterministic-conformance-fixture',
-              'agencybench_pin':'ec65324be69e81bd4fe394ef6a86d48b8fa5da56',
-              'scenario':'Backend/scenario1',
-              'agentweave_selected_family':route.get('selected_family'),
-              'visible_subtasks':route.get('visible_subtasks'),
-              'native_contracts_scored':len(subtasks),
-              'native_rubric_attempts':attempts,
-              'mean_best_score':mean,
-              'contracts_with_nonzero_score':passed,
-              'local_acceptance_passed':Path('backend-local-acceptance.txt').read_text().strip() == 'yes',
-              'runtime_seconds':int(Path('backend-native.seconds').read_text().strip() or 0),
-              'boundary':'This run proves AgentWeave routing plus execution of all five pinned AgencyBench Backend native contracts against a deterministic conformance workspace. It does not claim an LLM-generated AgencyBench task-completion score.'
+            'proof_mode':'deterministic-conformance-fixture',
+            'agencybench_pin':'ec65324be69e81bd4fe394ef6a86d48b8fa5da56',
+            'scenario':'Backend/scenario1',
+            'agentweave_selected_family':route.get('selected_family'),
+            'visible_subtasks':route.get('visible_subtasks'),
+            'native_contracts_scored':len(subtasks),
+            'native_rubric_attempts':attempts,
+            'mean_best_score':mean,
+            'contracts_with_nonzero_score':passed,
+            'local_acceptance_passed':Path('backend-local-acceptance.txt').read_text().strip()=='yes',
+            'runtime_seconds':int(Path('backend-native.seconds').read_text().strip() or 0),
+            'boundary':'This proves AgentWeave routing plus execution of all five pinned AgencyBench Backend native contracts against a deterministic conformance workspace. It is not an LLM-generated task-completion score.'
           }
           Path('agencybench-native-e2e-results.json').write_text(json.dumps(result,indent=2)+'\n')
-          md=f'''# AgencyBench native Backend contract proof\n\n| Component | Result |\n|---|---:|\n| AgentWeave selected family | {result['agentweave_selected_family']} |\n| Backend native contracts scored | {result['native_contracts_scored']} |\n| Native rubric attempts | {result['native_rubric_attempts']} |\n| Contracts with non-zero score | {result['contracts_with_nonzero_score']} |\n| Mean native best score | {result['mean_best_score']:.2f}/10 |\n| Local acceptance commands | {'PASS' if result['local_acceptance_passed'] else 'FAIL'} |\n| Native evaluator runtime | {result['runtime_seconds']} s |\n\n## Boundary\n\n{result['boundary']}\n'''
-          Path('agencybench-native-e2e-results.md').write_text(md)
-          print(md)
+          Path('agencybench-native-e2e-results.md').write_text(
+            '# AgencyBench native Backend contract proof\n\n'
+            f"- AgentWeave selected family: **{result['agentweave_selected_family']}**\n"
+            f"- Native contracts scored: **{result['native_contracts_scored']}**\n"
+            f"- Native rubric attempts: **{result['native_rubric_attempts']}**\n"
+            f"- Contracts with non-zero score: **{result['contracts_with_nonzero_score']}**\n"
+            f"- Mean native best score: **{result['mean_best_score']:.2f}/10**\n"
+            f"- Local acceptance: **{'PASS' if result['local_acceptance_passed'] else 'FAIL'}**\n\n"
+            f"Boundary: {result['boundary']}\n"
+          )
+          print(json.dumps(result,indent=2))
           PY
           cat agencybench-native-e2e-results.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -312,15 +269,15 @@ jobs:
           python - <<'PY'
           import json
           r=json.load(open('agencybench-native-e2e-results.json'))
-          assert r['agentweave_selected_family'] == 'Backend', r
-          assert r['visible_subtasks'] == 5, r
-          assert r['native_contracts_scored'] == 5, r
-          assert r['native_rubric_attempts'] >= 5, r
-          assert r['contracts_with_nonzero_score'] >= 1, r
-          assert r['mean_best_score'] > 0, r
+          assert r['agentweave_selected_family']=='Backend', r
+          assert r['visible_subtasks']==5, r
+          assert r['native_contracts_scored']==5, r
+          assert r['native_rubric_attempts']>=5, r
+          assert r['contracts_with_nonzero_score']>=1, r
+          assert r['mean_best_score']>0, r
           assert r['local_acceptance_passed'] is True, r
-          assert r['proof_mode'] == 'deterministic-conformance-fixture', r
-          print('Pinned AgencyBench Backend native contracts executed with non-zero native evidence and exact local acceptance commands passing.')
+          assert r['proof_mode']=='deterministic-conformance-fixture', r
+          print('Pinned AgencyBench Backend native contracts executed with non-zero evidence.')
           PY
 
       - name: Upload native evidence
