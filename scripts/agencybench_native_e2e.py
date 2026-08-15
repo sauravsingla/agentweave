@@ -10,6 +10,10 @@ from typing import Any
 
 from agencybench_external_eval import build_router, load_tasks, visible_query
 
+PRIMARY_MODEL = "qwen2.5-coder:3b"
+FALLBACK_MODEL = "qwen3:4b"
+VISION_MODEL = "qwen3-vl:2b"
+
 
 def route_scenario(root: Path, scenario: str, output: Path) -> dict[str, Any]:
     tasks = load_tasks(root)
@@ -31,9 +35,10 @@ def route_scenario(root: Path, scenario: str, output: Path) -> dict[str, Any]:
         "selected_family": ranked[0][0] if ranked else None,
         "selection_margin": (ranked[0][1] - ranked[1][1]) if len(ranked) > 1 else (ranked[0][1] if ranked else 0.0),
         "candidate_agents": [
-            {"agent": "primary", "model": "openai/gpt-4.1", "family": ranked[0][0] if ranked else None},
-            {"agent": "fallback", "model": "openai/gpt-4o", "family": ranked[0][0] if ranked else None},
+            {"agent": "primary", "model": PRIMARY_MODEL, "family": ranked[0][0] if ranked else None},
+            {"agent": "fallback", "model": FALLBACK_MODEL, "family": ranked[0][0] if ranked else None},
         ],
+        "vision_judge_model": VISION_MODEL,
     }
     output.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result, indent=2))
@@ -86,7 +91,7 @@ def _score_summary(meta: Any) -> dict[str, Any]:
         "native_judge_attempts": native_judge_attempts,
         "best_scores": best_scores,
         "mean_best_score": statistics.fmean(best_scores) if best_scores else 0.0,
-        "completed_all_subtasks": bool(subtasks),
+        "completed_all_subtasks": len(subtasks) >= 5,
     }
 
 
@@ -100,13 +105,14 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
                 row = json.loads(line)
             except Exception:
                 continue
-            if row.get("kind") in {"proxy-start", "proxy-stop"}:
+            if row.get("kind") in {"proxy-start", "proxy-stop", "local-model-list"}:
                 continue
             rows.append(row)
     usage = Counter()
     tool_calls = 0
     statuses = Counter()
     models = Counter()
+    labels = Counter()
     wall_ms = 0.0
     for row in rows:
         u = row.get("usage") or {}
@@ -119,12 +125,15 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
         statuses[str(row.get("status"))] += 1
         if row.get("model"):
             models[str(row["model"])] += 1
+        if row.get("label"):
+            labels[str(row["label"])] += 1
         try:
             wall_ms += float(row.get("wall_ms") or 0.0)
         except Exception:
             pass
     return {
         "model_requests": len(rows),
+        "requests_by_role": dict(labels),
         "models": dict(models),
         "statuses": dict(statuses),
         "prompt_tokens_reported": usage["prompt_tokens"],
@@ -132,8 +141,8 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
         "total_tokens_reported": usage["total_tokens"],
         "tool_calls_reported": tool_calls,
         "upstream_request_wall_seconds": wall_ms / 1000.0,
-        "monetary_cost_usd": None,
-        "cost_note": "GitHub Models via GITHUB_TOKEN does not return a monetary charge in the inference response; token/tool usage is reported without inventing a dollar cost.",
+        "monetary_cost_usd": 0.0,
+        "cost_note": "Models execute locally in Ollama on the GitHub-hosted runner, so there is no external per-token API charge in this proof. Runner/computing opportunity cost is not converted into a fabricated dollar amount.",
     }
 
 
@@ -142,8 +151,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
     fallback = _score_summary(_load(Path(args.backend_fallback_meta)) if args.backend_fallback_meta else None)
     frontend = _score_summary(_load(Path(args.frontend_meta)) if args.frontend_meta else None)
     route = _load(Path(args.route)) if args.route else None
-    meter_paths = [Path(p) for p in args.meter]
-    meter = _meter_summary(meter_paths)
+    meter = _meter_summary([Path(p) for p in args.meter])
     runtime = {}
     for item in args.runtime or []:
         key, value = item.split("=", 1)
@@ -154,23 +162,25 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
 
     recovery_triggered = bool(fallback.get("available"))
     result = {
-        "protocol": "AgencyBench native representative end-to-end proof: full Backend/scenario1 (5 sequential subtasks) plus Frontend/scenario1 subtask-1 Docker/visual-judge smoke; GitHub Models provides live agent/evaluator inference; AgencyBench upstream eval_task.py provides native execution/judging/feedback.",
+        "protocol": "AgencyBench native representative end-to-end proof: full Backend/scenario1 (5 sequential subtasks) plus Frontend/scenario1 subtask-1 official Docker/browser/text+vision judge smoke. Local open models execute the live agent and evaluator requests; upstream AgencyBench eval_task.py provides native tools, execution, rubric scoring and feedback/retry loops.",
         "routing": route,
         "backend_primary": primary,
         "backend_fallback": fallback,
         "frontend_docker_native_judge": frontend,
         "recovery": {
             "triggered": recovery_triggered,
-            "policy": "If primary Backend/scenario1 mean native score < 6 or execution failed, rerun the same scenario with the alternate candidate agent/model and the same native AgencyBench judge contract.",
+            "policy": "If primary Backend/scenario1 mean native score < 6 or execution is incomplete, rerun the same full scenario with the alternate candidate model and the same native AgencyBench judge contract.",
         },
         "metering": meter,
         "runtime": runtime,
         "boundaries": [
-            "Backend/scenario1 is the full five-subtask upstream long-horizon scenario; this run is not the entire 138-task AgencyBench suite.",
-            "Frontend/scenario1 is intentionally limited to subtask1 to exercise the official Docker sandbox, browser evidence collection, text judge, vision judge, and feedback loop without claiming a full Frontend scenario score.",
-            "Agent and evaluator calls are live GitHub Models inference requests, not synthetic outputs.",
-            "AgencyBench native meta_eval scores are reported as produced; low scores are valid benchmark outcomes and do not make the infrastructure proof fail.",
-            "Monetary cost is left null because GitHub Models does not expose per-request dollar cost through the response used here.",
+            "Backend/scenario1 is the complete five-subtask upstream long-horizon scenario; this is a representative native slice, not the entire 138-task AgencyBench suite.",
+            "Frontend/scenario1 is intentionally limited to subtask1 to exercise the official Docker sandbox, browser evidence collection, text judge, vision judge, and evaluator-feedback retry loop without claiming a complete Frontend scenario score.",
+            "Agent and evaluator calls are live local Ollama inference requests using open models, not synthetic/prewritten outputs.",
+            "The AgencyBench scripts provide the available shell/file/browser tool environment and native rubric feedback. The measured model tool-call field counts tool_call objects exposed by the OpenAI-compatible model API; AgencyBench-side command/tool activity is also preserved in meta_eval artifacts.",
+            "AgencyBench native meta_eval scores are reported as produced; low scores remain valid benchmark outcomes and do not get rewritten into infrastructure success.",
+            "Monetary model API cost is $0 for local inference; runner cost is not invented or inferred from GitHub-hosted billing metadata.",
+            "This proof exercises AgencyBench evaluator-driven user-feedback/self-correction. It does not claim a separate hidden human user or an additional user-simulator implementation beyond what the pinned upstream scenario exposes.",
         ],
     }
     Path(args.output_json).write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -192,6 +202,7 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
         f"| Reported completion tokens | {meter.get('completion_tokens_reported', 0)} |",
         f"| Reported total tokens | {meter.get('total_tokens_reported', 0)} |",
         f"| Reported model tool calls | {meter.get('tool_calls_reported', 0)} |",
+        "| External model API cost | **$0.00 (local inference)** |",
         "",
         "## Boundary",
         "",
