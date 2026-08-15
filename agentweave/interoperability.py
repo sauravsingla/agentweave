@@ -14,6 +14,9 @@ class InteropTarget:
     rpc_method: str|None=None
     message: dict|None=None
     content_type: str|None=None
+    params: dict|None=None
+    headers: dict|None=None
+    bootstrap: dict|None=None
 
 @dataclass
 class InteropResult:
@@ -27,6 +30,14 @@ class InteropResult:
     transport: str|None=None
     streaming_advertised: bool=False
 
+
+def _dig(obj,path):
+    cur=obj
+    for part in str(path).split('.'):
+        if not isinstance(cur,dict) or part not in cur: return None
+        cur=cur[part]
+    return cur
+
 class A2AInteropSuite:
     def __init__(self,adapter=None): self.discovery=AgentCardDiscovery(); self.adapter=adapter or HttpA2AAdapter()
     async def run_target(self,target:InteropTarget,prompt='A2A interoperability test'):
@@ -37,8 +48,16 @@ class A2AInteropSuite:
             return InteropResult(target.name,target.implementation,False,False,(time.perf_counter()-started)*1000,str(exc))
         transport=str(agent.metadata.get('protocol_binding') or 'JSONRPC')
         try:
+            runtime_headers=dict(target.headers or {})
+            if target.bootstrap:
+                boot=target.bootstrap
+                result=await self.adapter.rpc_call(agent,boot['method'],boot.get('params') or {},extra_headers=runtime_headers)
+                for header,path in (boot.get('capture_headers') or {}).items():
+                    value=_dig(result,path)
+                    if value is None: raise RuntimeError(f'Bootstrap response missing {path} required for {header}')
+                    runtime_headers[header]=str(value)
             if target.message is not None:
-                await self.adapter.invoke_message(agent,target.message,rpc_method=target.rpc_method,context={'test':'agentweave-interop','implementation':target.implementation},content_type=target.content_type)
+                await self.adapter.invoke_message(agent,target.message,rpc_method=target.rpc_method,context={'test':'agentweave-interop','implementation':target.implementation},content_type=target.content_type,extra_params=target.params,extra_headers=runtime_headers)
             else:
                 await self.adapter.invoke(agent,prompt,context={'test':'agentweave-interop','implementation':target.implementation})
             return InteropResult(target.name,target.implementation,True,True,(time.perf_counter()-started)*1000,None,agent.name,transport,bool(agent.metadata.get('streaming')))
