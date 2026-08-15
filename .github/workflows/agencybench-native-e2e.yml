@@ -92,7 +92,8 @@ jobs:
         shell: bash
         run: |
           set +e
-          DIR=external/AgencyBench/AgencyBench-v2/Backend/scenario1
+          ROOT="$PWD"
+          DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Backend/scenario1"
           FAMILY=$(python - <<'PY'
           import json
           print(json.load(open('agencybench-native-route.json'))['selected_family'])
@@ -110,19 +111,24 @@ jobs:
           SII_MAX_TURNS=80
           EOF
           START=$(date +%s)
-          timeout 3000s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.json" 2>&1 | tee backend-primary.log
+          (
+            cd "$DIR"
+            timeout 3000s python eval_task.py --env .env.agentweave --description description.json
+          ) 2>&1 | tee "$ROOT/backend-primary.log"
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
-          echo "$RC" > backend-primary.rc
-          echo "$((END-START))" > backend-primary.seconds
+          echo "$RC" > "$ROOT/backend-primary.rc"
+          echo "$((END-START))" > "$ROOT/backend-primary.seconds"
           META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen2.5-coder_3b' | head -1)
-          if [ -n "$META" ]; then cp "$META" backend-primary-meta.json; fi
+          if [ -z "$META" ]; then META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | head -1); fi
+          if [ -n "$META" ]; then cp "$META" "$ROOT/backend-primary-meta.json"; fi
           exit 0
 
       - name: Decide and execute AgentWeave recovery re-route
         shell: bash
         run: |
           set +e
+          ROOT="$PWD"
           NEED_RECOVERY=$(python - <<'PY'
           import json, pathlib
           p=pathlib.Path('backend-primary-meta.json')
@@ -140,7 +146,7 @@ jobs:
             echo 'Primary completed with sufficient native score; fallback not needed.'
             exit 0
           fi
-          DIR=external/AgencyBench/AgencyBench-v2/Backend/scenario1
+          DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Backend/scenario1"
           FAMILY=$(python - <<'PY'
           import json
           print(json.load(open('agencybench-native-route.json'))['selected_family'])
@@ -158,13 +164,17 @@ jobs:
           SII_MAX_TURNS=80
           EOF
           START=$(date +%s)
-          timeout 1800s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave-fallback" --description "$DIR/description.json" 2>&1 | tee backend-fallback.log
+          (
+            cd "$DIR"
+            timeout 1800s python eval_task.py --env .env.agentweave-fallback --description description.json
+          ) 2>&1 | tee "$ROOT/backend-fallback.log"
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
-          echo "$RC" > backend-fallback.rc
-          echo "$((END-START))" > backend-fallback.seconds
+          echo "$RC" > "$ROOT/backend-fallback.rc"
+          echo "$((END-START))" > "$ROOT/backend-fallback.seconds"
           META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen3_4b' | head -1)
-          if [ -n "$META" ]; then cp "$META" backend-fallback-meta.json; fi
+          if [ -z "$META" ]; then META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | tail -1); fi
+          if [ -n "$META" ]; then cp "$META" "$ROOT/backend-fallback-meta.json"; fi
           exit 0
 
       - name: Start official AgencyBench Docker sandbox
@@ -185,13 +195,15 @@ jobs:
         shell: bash
         run: |
           set +e
-          DIR=external/AgencyBench/AgencyBench-v2/Frontend/scenario1
+          ROOT="$PWD"
+          DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Frontend/scenario1"
+          cp "$DIR/description.json" "$ROOT/frontend-description-original.json"
           python - <<'PY'
           import json
           from pathlib import Path
           p=Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.json')
           d=json.load(p.open())
-          Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.agentweave.json').write_text(json.dumps({'subtask_count':1,'subtask1':d['subtask1']},indent=2))
+          p.write_text(json.dumps({'subtask_count':1,'subtask1':d['subtask1']},indent=2), encoding='utf-8')
           PY
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
@@ -214,13 +226,17 @@ jobs:
           QWEN_VISION_API_KEY=ollama-local
           EOF
           START=$(date +%s)
-          timeout 1500s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.agentweave.json" 2>&1 | tee frontend-native.log
+          (
+            cd "$DIR"
+            timeout 1500s python eval_task.py --env .env.agentweave
+          ) 2>&1 | tee "$ROOT/frontend-native.log"
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
-          echo "$RC" > frontend-native.rc
-          echo "$((END-START))" > frontend-native.seconds
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen2.5-coder_3b' | head -1)
-          if [ -n "$META" ]; then cp "$META" frontend-native-meta.json; fi
+          echo "$RC" > "$ROOT/frontend-native.rc"
+          echo "$((END-START))" > "$ROOT/frontend-native.seconds"
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | head -1)
+          if [ -n "$META" ]; then cp "$META" "$ROOT/frontend-native-meta.json"; fi
+          cp "$ROOT/frontend-description-original.json" "$DIR/description.json"
           exit 0
 
       - name: Build measured native E2E report
@@ -283,6 +299,7 @@ jobs:
             frontend-native.log
             frontend-native.rc
             frontend-native.seconds
+            frontend-description-original.json
             docker-sandbox-ready.txt
             docker-sandbox-inspect.json
             ollama.log
