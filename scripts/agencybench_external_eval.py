@@ -63,8 +63,15 @@ def load_tasks(root: Path) -> list[dict]:
             for key, value in data.items():
                 if re.fullmatch(r"subtask\d+", str(key)) and isinstance(value, str):
                     subtasks.append((int(str(key)[7:]), value))
+            scenario_id = f"{family}/{path.parent.name}"
             for number, raw in sorted(subtasks):
-                tasks.append({"id": f"{family}/{path.parent.name}/subtask{number}", "family": family, "query": visible_query(raw)})
+                tasks.append({
+                    "id": f"{scenario_id}/subtask{number}",
+                    "scenario": scenario_id,
+                    "subtask": number,
+                    "family": family,
+                    "query": visible_query(raw),
+                })
     return tasks
 
 
@@ -94,12 +101,31 @@ def build_router(tasks: list[dict]):
         for family in FAMILIES:
             score = cosine(qtf, profile_tf[family], idf)
             score += min(0.45, 0.09 * sum(1 for p in PHRASES[family] if p in low))
-            if family == "Research" and ("research" in caps or "retrieval" in caps): score += 0.18
-            if family in {"Backend", "Code", "Frontend", "Game"} and "coding" in caps: score += 0.04
-            if family == "MCP" and "mcp" in low: score += 0.30
+            if family == "Research" and ("research" in caps or "retrieval" in caps):
+                score += 0.18
+            if family in {"Backend", "Code", "Frontend", "Game"} and "coding" in caps:
+                score += 0.04
+            if family == "MCP" and "mcp" in low:
+                score += 0.30
             scores[family] = score
         return sorted(scores.items(), key=lambda x: (-x[1], x[0]))
+
     return rank
+
+
+def _margin(ranked: list[tuple[str, float]]) -> float:
+    if len(ranked) < 2:
+        return ranked[0][1] if ranked else 0.0
+    return ranked[0][1] - ranked[1][1]
+
+
+def _scenario_groups(tasks: list[dict]) -> dict[str, list[dict]]:
+    groups = defaultdict(list)
+    for task in tasks:
+        groups[task["scenario"]].append(task)
+    for values in groups.values():
+        values.sort(key=lambda x: x["subtask"])
+    return dict(groups)
 
 
 def evaluate(tasks: list[dict]) -> dict:
@@ -107,47 +133,224 @@ def evaluate(tasks: list[dict]) -> dict:
     rng = random.Random(7)
     family_counts = Counter(t["family"] for t in tasks)
     single_best = family_counts.most_common(1)[0][0]
-    correct1 = correct3 = random_correct = single_correct = 0
+    correct1 = correct2 = correct3 = random_correct = single_correct = 0
     confusion = defaultdict(Counter)
     latencies = []
+    margins = []
     rows = []
+
     for task in tasks:
-        start = time.perf_counter(); ranked = rank(task["query"]); latencies.append((time.perf_counter() - start) * 1000.0)
-        predicted = ranked[0][0]; top3 = [x[0] for x in ranked[:3]]
-        correct1 += int(predicted == task["family"]); correct3 += int(task["family"] in top3)
-        random_correct += int(rng.choice(FAMILIES) == task["family"]); single_correct += int(single_best == task["family"])
+        start = time.perf_counter()
+        ranked = rank(task["query"])
+        latencies.append((time.perf_counter() - start) * 1000.0)
+        predicted = ranked[0][0]
+        top2 = [x[0] for x in ranked[:2]]
+        top3 = [x[0] for x in ranked[:3]]
+        correct1 += int(predicted == task["family"])
+        correct2 += int(task["family"] in top2)
+        correct3 += int(task["family"] in top3)
+        random_correct += int(rng.choice(FAMILIES) == task["family"])
+        single_correct += int(single_best == task["family"])
         confusion[task["family"]][predicted] += 1
-        rows.append({"id": task["id"], "ground_truth": task["family"], "prediction": predicted, "top3": top3, "scores": ranked})
+        margins.append(_margin(ranked))
+        rows.append({
+            "id": task["id"],
+            "scenario": task["scenario"],
+            "subtask": task["subtask"],
+            "ground_truth": task["family"],
+            "prediction": predicted,
+            "top2": top2,
+            "top3": top3,
+            "margin": _margin(ranked),
+            "scores": ranked,
+        })
+
     per_family = {}
     for family in FAMILIES:
-        total = family_counts[family]; hit = confusion[family][family]
+        total = family_counts[family]
+        hit = confusion[family][family]
         per_family[family] = {"tasks": total, "hit1": hit / total if total else 0.0}
+
+    groups = _scenario_groups(tasks)
+    scenario_rows = []
+    cumulative_correct1 = cumulative_correct3 = 0
+    first_correct = later_correct = first_total = later_total = 0
+    stable_transitions = total_transitions = 0
+    scenario_majority_correct = 0
+
+    for scenario, subtasks in sorted(groups.items()):
+        cumulative_text = []
+        independent_predictions = []
+        cumulative_predictions = []
+        family = subtasks[0]["family"]
+        for idx, task in enumerate(subtasks):
+            independent = rank(task["query"])
+            independent_predictions.append(independent[0][0])
+            cumulative_text.append(task["query"])
+            cumulative_ranked = rank("\n\nPrevious/Current task context:\n" + "\n\n".join(cumulative_text))
+            cumulative_predictions.append(cumulative_ranked[0][0])
+            cumulative_correct1 += int(cumulative_ranked[0][0] == family)
+            cumulative_correct3 += int(family in [x[0] for x in cumulative_ranked[:3]])
+            if idx == 0:
+                first_total += 1
+                first_correct += int(independent[0][0] == family)
+            else:
+                later_total += 1
+                later_correct += int(independent[0][0] == family)
+                total_transitions += 1
+                stable_transitions += int(independent_predictions[-1] == independent_predictions[-2])
+
+        majority = Counter(independent_predictions).most_common()
+        max_count = majority[0][1]
+        tied = sorted([name for name, count in majority if count == max_count])
+        majority_prediction = tied[0]
+        scenario_majority_correct += int(majority_prediction == family)
+        scenario_rows.append({
+            "scenario": scenario,
+            "ground_truth": family,
+            "subtasks": len(subtasks),
+            "independent_predictions": independent_predictions,
+            "cumulative_predictions": cumulative_predictions,
+            "majority_prediction": majority_prediction,
+        })
+
+    margin_thresholds = [0.00, 0.03, 0.05, 0.08, 0.10, 0.15]
+    selective = []
+    for threshold in margin_thresholds:
+        committed = [r for r in rows if r["margin"] >= threshold]
+        correct = sum(r["prediction"] == r["ground_truth"] for r in committed)
+        selective.append({
+            "margin_threshold": threshold,
+            "committed": len(committed),
+            "coverage": len(committed) / len(rows),
+            "accuracy_when_committed": correct / len(committed) if committed else 0.0,
+            "full_dataset_correct": correct / len(rows),
+        })
+
     return {
-        "agencybench_commit": AGENCYBENCH_COMMIT, "tasks": len(tasks),
+        "agencybench_commit": AGENCYBENCH_COMMIT,
+        "tasks": len(tasks),
         "published_paper_task_count": 138,
         "parsed_description_subtasks": len(tasks),
-        "scenarios": len({x["id"].rsplit("/", 1)[0] for x in tasks}), "families": dict(family_counts),
-        "method": {"agentweave": {"hit1": correct1/len(tasks), "hit3": correct3/len(tasks)}, "random": {"hit1": random_correct/len(tasks)}, "single_best": {"family": single_best, "hit1": single_correct/len(tasks)}},
-        "macro_hit1": statistics.mean(v["hit1"] for v in per_family.values()), "per_family": per_family,
-        "mean_routing_ms": statistics.mean(latencies), "p95_routing_ms": sorted(latencies)[max(0, math.ceil(0.95*len(latencies))-1)],
-        "confusion": {k: dict(v) for k, v in confusion.items()}, "rows": rows,
+        "scenarios": len(groups),
+        "families": dict(family_counts),
+        "method": {
+            "agentweave": {
+                "hit1": correct1 / len(tasks),
+                "hit2_team_coverage": correct2 / len(tasks),
+                "hit3": correct3 / len(tasks),
+            },
+            "random": {"hit1": random_correct / len(tasks)},
+            "single_best": {"family": single_best, "hit1": single_correct / len(tasks)},
+        },
+        "macro_hit1": statistics.mean(v["hit1"] for v in per_family.values()),
+        "per_family": per_family,
+        "sequential": {
+            "cumulative_context_hit1": cumulative_correct1 / len(tasks),
+            "cumulative_context_hit3": cumulative_correct3 / len(tasks),
+            "first_subtask_hit1": first_correct / first_total if first_total else 0.0,
+            "later_subtask_hit1": later_correct / later_total if later_total else 0.0,
+            "prediction_stability_across_subtasks": stable_transitions / total_transitions if total_transitions else 0.0,
+            "scenario_majority_hit1": scenario_majority_correct / len(groups),
+        },
+        "selective_by_margin": selective,
+        "mean_margin": statistics.mean(margins),
+        "mean_routing_ms": statistics.mean(latencies),
+        "p95_routing_ms": sorted(latencies)[max(0, math.ceil(0.95 * len(latencies)) - 1)],
+        "confusion": {k: dict(v) for k, v in confusion.items()},
+        "scenario_rows": scenario_rows,
+        "rows": rows,
     }
 
 
 def markdown(result: dict) -> str:
-    aw=result["method"]["agentweave"]; rnd=result["method"]["random"]; sb=result["method"]["single_best"]
-    lines=["# AgencyBench external capability-family routing evaluation","",f"Official AgencyBench pin: `{result['agencybench_commit']}`","",f"Machine-readable `description.json` subtasks scored: **{result['tasks']}** across **{result['scenarios']}** scenarios and **6** capability families.","",f"AgencyBench's paper/README describes **{result['published_paper_task_count']} tasks** overall; this run found **{result['parsed_description_subtasks']} string subtasks** in the pinned V2 `description.json` files, so the result is explicitly reported on that parsed subset rather than claiming all 138.","","**Blind protocol:** AgentWeave receives only the task query/requirements. The parent AgencyBench capability-family label is withheld until after routing; deliverables and rubrics are stripped before routing.","","| Method | Hit@1 | Hit@3 |","|---|---:|---:|",f"| **AgentWeave** | **{aw['hit1']:.1%}** | **{aw['hit3']:.1%}** |",f"| Random | {rnd['hit1']:.1%} | — |",f"| Single-best ({sb['family']}) | {sb['hit1']:.1%} | — |","",f"Macro Hit@1: **{result['macro_hit1']:.1%}**. Mean routing time: **{result['mean_routing_ms']:.3f} ms/task**; p95: **{result['p95_routing_ms']:.3f} ms/task**.","","## Per capability family","","| Family | Tasks | Hit@1 |","|---|---:|---:|"]
+    aw = result["method"]["agentweave"]
+    rnd = result["method"]["random"]
+    sb = result["method"]["single_best"]
+    seq = result["sequential"]
+    lines = [
+        "# AgencyBench external capability-family routing evaluation",
+        "",
+        f"Official AgencyBench pin: `{result['agencybench_commit']}`",
+        "",
+        f"Machine-readable `description.json` subtasks scored: **{result['tasks']}** across **{result['scenarios']}** scenarios and **6** capability families.",
+        "",
+        f"AgencyBench's paper/README describes **{result['published_paper_task_count']} tasks** overall; this run found **{result['parsed_description_subtasks']} string subtasks** in the pinned V2 `description.json` files, so the result is explicitly reported on that parsed subset rather than claiming all 138.",
+        "",
+        "**Blind protocol:** AgentWeave receives only the task query/requirements. The parent AgencyBench capability-family label is withheld until after routing; deliverables and rubrics are stripped before routing.",
+        "",
+        "| Method | Hit@1 | Top-2 team coverage | Hit@3 |",
+        "|---|---:|---:|---:|",
+        f"| **AgentWeave** | **{aw['hit1']:.1%}** | **{aw['hit2_team_coverage']:.1%}** | **{aw['hit3']:.1%}** |",
+        f"| Random | {rnd['hit1']:.1%} | — | — |",
+        f"| Single-best ({sb['family']}) | {sb['hit1']:.1%} | — | — |",
+        "",
+        f"Macro Hit@1: **{result['macro_hit1']:.1%}**. Mean routing time: **{result['mean_routing_ms']:.3f} ms/task**; p95: **{result['p95_routing_ms']:.3f} ms/task**.",
+        "",
+        "## Sequential / scenario-aware analysis",
+        "",
+        "This secondary analysis tests AgencyBench's multi-stage structure without executing the environment. For each later subtask, a cumulative variant gives the router the visible queries from previous subtasks in the same scenario; no family label, deliverable, or rubric is exposed.",
+        "",
+        "| Metric | Result |",
+        "|---|---:|",
+        f"| Independent task Hit@1 | {aw['hit1']:.1%} |",
+        f"| Cumulative-context Hit@1 | **{seq['cumulative_context_hit1']:.1%}** |",
+        f"| Cumulative-context Hit@3 | **{seq['cumulative_context_hit3']:.1%}** |",
+        f"| First-subtask cold-start Hit@1 | {seq['first_subtask_hit1']:.1%} |",
+        f"| Later-subtask independent Hit@1 | {seq['later_subtask_hit1']:.1%} |",
+        f"| Prediction stability across consecutive subtasks | {seq['prediction_stability_across_subtasks']:.1%} |",
+        f"| Scenario-majority family Hit@1 | **{seq['scenario_majority_hit1']:.1%}** |",
+        "",
+        "## Confidence / abstention analysis",
+        "",
+        "The score margin between the first- and second-ranked families is used only as a simple, label-free confidence signal.",
+        "",
+        "| Margin threshold | Coverage | Accuracy when committed | Correct over full set |",
+        "|---:|---:|---:|---:|",
+    ]
+    for x in result["selective_by_margin"]:
+        lines.append(f"| {x['margin_threshold']:.2f} | {x['coverage']:.1%} | {x['accuracy_when_committed']:.1%} | {x['full_dataset_correct']:.1%} |")
+
+    lines += [
+        "",
+        "## Per capability family",
+        "",
+        "| Family | Tasks | Hit@1 |",
+        "|---|---:|---:|",
+    ]
     for family in FAMILIES:
-        x=result["per_family"][family]; lines.append(f"| {family} | {x['tasks']} | {x['hit1']:.1%} |")
-    lines += ["","## Interpretation boundary","","- External published AgencyBench `description.json` task text is used from the pinned upstream repository.","- Ground-truth family labels come only from the upstream directory structure and are hidden until scoring.","- Deliverables and rubrics are not given to the router.","- Candidate family descriptions are fixed generic capability metadata, not derived from benchmark examples.","- This measures capability-family routing only; it does **not** execute the hours-long AgencyBench scenarios, Docker visual/functional judges, user simulation, or model/tool calls.","- It must not be reported as AgencyBench end-to-end task score."]
-    return "\n".join(lines)+"\n"
+        x = result["per_family"][family]
+        lines.append(f"| {family} | {x['tasks']} | {x['hit1']:.1%} |")
+
+    lines += [
+        "",
+        "## Interpretation boundary",
+        "",
+        "- External published AgencyBench `description.json` task text is used from the pinned upstream repository.",
+        "- Ground-truth family labels come only from the upstream directory structure and are hidden until scoring.",
+        "- Deliverables and rubrics are not given to the router.",
+        "- Candidate family descriptions are fixed generic capability metadata, not derived from benchmark examples.",
+        "- Top-2 is reported as potential specialist-team coverage: it asks whether the correct family is present among two candidate families; it does not claim that two agents were executed.",
+        "- Cumulative-context routing uses only earlier visible task queries from the same scenario and does not use benchmark outcomes, labels, or rubrics.",
+        "- This still measures routing only; it does **not** execute the hours-long AgencyBench scenarios, Docker visual/functional judges, user simulation, model/tool calls, or final task outcomes.",
+        "- It must not be reported as AgencyBench end-to-end task score.",
+    ]
+    return "\n".join(lines) + "\n"
 
 
 def main():
-    parser=argparse.ArgumentParser(); parser.add_argument("--agencybench-root", default="external/AgencyBench"); args=parser.parse_args()
-    tasks=load_tasks(Path(args.agencybench_root))
-    if len(tasks) < 100: raise SystemExit(f"Unexpectedly few AgencyBench-v2 subtasks: {len(tasks)}")
-    result=evaluate(tasks); Path("agencybench-routing-results.json").write_text(json.dumps(result,indent=2),encoding="utf-8")
-    md=markdown(result); Path("agencybench-routing-results.md").write_text(md,encoding="utf-8"); print(md)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--agencybench-root", default="external/AgencyBench")
+    args = parser.parse_args()
+    tasks = load_tasks(Path(args.agencybench_root))
+    if len(tasks) < 100:
+        raise SystemExit(f"Unexpectedly few AgencyBench-v2 subtasks: {len(tasks)}")
+    result = evaluate(tasks)
+    Path("agencybench-routing-results.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
+    md = markdown(result)
+    Path("agencybench-routing-results.md").write_text(md, encoding="utf-8")
+    print(md)
 
-if __name__ == "__main__": main()
+
+if __name__ == "__main__":
+    main()
