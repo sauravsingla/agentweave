@@ -24,8 +24,8 @@ class RequirementAnalyzer:
 
     Layer 1 is deterministic lexical/phrase matching. Layer 2 adds generic semantic
     intent heuristics for task classes whose domain is often implicit in natural
-    language (for example factual entity/relation lookup). Layer 3 is an optional
-    pluggable semantic/LLM inferencer that can enrich low-confidence requests.
+    language. Layer 3 is an optional pluggable semantic/LLM inferencer that can enrich
+    low-confidence requests.
 
     The built-in layers do not consume benchmark labels or expected specialist IDs.
     """
@@ -34,7 +34,7 @@ class RequirementAnalyzer:
         "research": {"research", "evidence", "literature", "investigate"},
         "summarization": {"summarize", "summary", "brief"},
         "analysis": {"analyze", "analyse", "evaluate", "assess"},
-        "coding": {"code", "program", "python", "c++", "software"},
+        "coding": {"code", "program", "python", "c++", "software", "javascript", "typescript"},
         "vision": {"image", "video", "vision", "camera"},
         "forecasting": {"forecast", "predict", "prediction"},
         "optimization": {"optimize", "optimise", "schedule", "routing"},
@@ -90,6 +90,57 @@ class RequirementAnalyzer:
             ),
             min_score=1.0,
         ),
+        _Concept(
+            capabilities=frozenset({"frontend", "web-ui", "coding"}),
+            domains=frozenset({"frontend", "web-ui"}),
+            knowledge=frozenset({"browser-ui"}),
+            terms=(
+                "html", "css", "dom", "svg", "react", "vue", "svelte", "angular",
+                "frontend", "browser", "viewport", "responsive", "canvas", "webgl",
+                "button", "sidebar", "modal", "layout", "stylesheet", "animation",
+            ),
+            phrases=(
+                "user interface", "web page", "web app", "landing page", "responsive layout",
+                "browser ui", "front end", "visual layout", "dom element", "css grid",
+            ),
+            min_score=1.5,
+        ),
+        _Concept(
+            capabilities=frozenset({"backend", "api", "coding"}),
+            domains=frozenset({"backend"}),
+            knowledge=frozenset({"services"}),
+            terms=(
+                "backend", "server", "service", "services", "endpoint", "endpoints", "api",
+                "fastapi", "django", "flask", "express", "webhook", "authentication", "oauth",
+                "jwt", "queue", "worker", "redis", "mongodb", "persistence", "concurrency",
+            ),
+            phrases=(
+                "rest api", "http api", "api endpoint", "backend service", "web service",
+                "server side", "authentication flow", "background worker", "message queue",
+            ),
+            min_score=1.5,
+        ),
+        _Concept(
+            capabilities=frozenset({"game-development", "coding"}),
+            domains=frozenset({"game-development"}),
+            knowledge=frozenset({"interactive-systems"}),
+            terms=(
+                "game", "gameplay", "player", "collision", "score", "winner", "board",
+                "level", "physics", "sprite", "move", "moves", "replay",
+            ),
+            phrases=(
+                "win detection", "game loop", "player controls", "board game", "game state",
+            ),
+            min_score=1.5,
+        ),
+        _Concept(
+            capabilities=frozenset({"mcp", "tool-use", "integration"}),
+            domains=frozenset({"mcp"}),
+            knowledge=frozenset({"tool-protocols"}),
+            terms=("mcp",),
+            phrases=("model context protocol", "mcp server", "mcp tool"),
+            min_score=1.0,
+        ),
     )
 
     factual_question_starters = ("who ", "where ", "when ", "which ", "what ")
@@ -105,7 +156,8 @@ class RequirementAnalyzer:
     technical_blockers = {
         "sql", "database", "table", "schema", "query", "column", "row", "bash", "shell",
         "terminal", "linux", "unix", "filesystem", "chmod", "grep", "systemctl", "python",
-        "code", "program",
+        "code", "program", "html", "css", "javascript", "typescript", "api", "server",
+        "frontend", "backend",
     }
 
     def __init__(self, semantic_inferencer: SemanticInferencer | None = None):
@@ -124,12 +176,6 @@ class RequirementAnalyzer:
         return term_hits + phrase_hits
 
     def _semantic_intent(self, normalized: str, tokens: set[str], ordered: list[str], inferred_domains: set[str]):
-        """Infer generic task intent when the implementation domain is implicit.
-
-        Short factual questions about entities and relations are treated as structured
-        knowledge retrieval candidates only when no stronger database/OS signal exists.
-        This is a domain-agnostic intent rule, not a benchmark-label mapping.
-        """
         if inferred_domains:
             return None
         starts_as_question = normalized.startswith(self.factual_question_starters)
@@ -203,7 +249,6 @@ class RequirementAnalyzer:
             confidence = max(confidence, semantic["confidence"])
             sources.append(semantic["source"])
 
-        # Optional semantic/LLM layer is called only for low-confidence requests.
         if self.semantic_inferencer and confidence < 0.75:
             external = self._merge_external(self.semantic_inferencer(text))
             if external and external["confidence"] > confidence:

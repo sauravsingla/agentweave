@@ -15,6 +15,33 @@ def test_operating_system_signal_is_high_confidence():
     assert req.inference_confidence >= 0.75
 
 
+def test_frontend_signal_is_separated_from_generic_coding():
+    req = RequirementAnalyzer().analyze("Build a responsive browser UI with HTML, CSS, SVG and a sidebar")
+    assert "frontend" in req.domains
+    assert "web-ui" in req.domains
+    assert {"frontend", "web-ui", "coding"} <= req.capabilities
+    assert req.inference_confidence >= 0.75
+
+
+def test_backend_signal_is_separated_from_generic_coding():
+    req = RequirementAnalyzer().analyze("Create a FastAPI backend service with JWT authentication and webhook endpoints")
+    assert "backend" in req.domains
+    assert {"backend", "api", "coding"} <= req.capabilities
+    assert req.inference_confidence >= 0.75
+
+
+def test_game_development_signal_is_explicit():
+    req = RequirementAnalyzer().analyze("Implement a browser game with player collision, score and win detection")
+    assert "game-development" in req.domains
+    assert "game-development" in req.capabilities
+
+
+def test_mcp_signal_is_explicit():
+    req = RequirementAnalyzer().analyze("Expose this integration as an MCP server with tool calls")
+    assert "mcp" in req.domains
+    assert {"mcp", "tool-use"} <= req.capabilities
+
+
 def test_generic_factual_entity_relation_question_uses_semantic_layer():
     req = RequirementAnalyzer().analyze("Where was Ada Lovelace born?")
     assert "knowledge-graph" in req.domains

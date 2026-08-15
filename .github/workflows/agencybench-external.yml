@@ -6,6 +6,7 @@ on:
     paths:
       - 'agentweave/**'
       - 'scripts/agencybench_external_eval.py'
+      - 'scripts/agencybench_crossval_eval.py'
       - '.github/workflows/agencybench-external.yml'
   workflow_dispatch:
 
@@ -39,10 +40,15 @@ jobs:
       - name: Install AgentWeave
         run: pip install -e .
 
-      - name: Evaluate blind AgencyBench capability-family routing
+      - name: Evaluate blind and scenario-aware AgencyBench routing
         run: |
           python scripts/agencybench_external_eval.py --agencybench-root external/AgencyBench
           cat agencybench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Evaluate scenario-grouped cross-validation
+        run: |
+          python scripts/agencybench_crossval_eval.py --agencybench-root external/AgencyBench
+          cat agencybench-crossval-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload AgencyBench evaluation evidence
         uses: actions/upload-artifact@v4
@@ -51,4 +57,6 @@ jobs:
           path: |
             agencybench-routing-results.json
             agencybench-routing-results.md
+            agencybench-crossval-results.json
+            agencybench-crossval-results.md
           if-no-files-found: error
