@@ -17,8 +17,8 @@ jobs:
     timeout-minutes: 120
     env:
       AGENCYBENCH_PIN: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
-      PRIMARY_MODEL: qwen2.5-coder:3b
-      FALLBACK_MODEL: qwen3:4b
+      PRIMARY_MODEL: qwen3:4b
+      FALLBACK_MODEL: qwen2.5-coder:3b
       VISION_MODEL: qwen3-vl:2b
     steps:
       - name: Checkout AgentWeave
@@ -48,12 +48,22 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           pip install -r external/AgencyBench/requirements.txt
+          # The pinned benchmark code uses SiiAgentOptions(enable_data_upload=...),
+          # which was added after the requirements.txt pin. Upgrade only this SDK
+          # compatibility layer; task text, scorers and rubric code stay pinned.
+          pip install --upgrade 'sii-agent-sdk==0.1.11'
+          python - <<'PY'
+          from inspect import signature
+          from sii_agent_sdk import SiiAgentOptions
+          assert 'enable_data_upload' in signature(SiiAgentOptions).parameters
+          print('SII SDK compatibility verified')
+          PY
 
       - name: Install Ollama and pull open models
         shell: bash
         run: |
           curl -fsSL https://ollama.com/install.sh | sh
-          nohup ollama serve > ollama.log 2>&1 & echo $! > ollama.pid
+          nohup ollama serve > ollama.log 2>&1 &
           for i in $(seq 1 45); do
             curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break
             sleep 2
@@ -63,68 +73,58 @@ jobs:
           ollama pull "$VISION_MODEL"
           ollama list | tee ollama-models.txt
 
-      - name: Start metered local model gateways
+      - name: Start metered model gateways
         run: |
           mkdir -p native-e2e-meter
           MODELS="${PRIMARY_MODEL},${FALLBACK_MODEL},${VISION_MODEL}"
-          nohup python scripts/github_models_meter_proxy.py --port 8911 --label agent --log native-e2e-meter/agent.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/agent-proxy.log 2>&1 & echo $! > native-e2e-meter/agent.pid
-          nohup python scripts/github_models_meter_proxy.py --port 8912 --label text-evaluator --log native-e2e-meter/text-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/text-proxy.log 2>&1 & echo $! > native-e2e-meter/text.pid
-          nohup python scripts/github_models_meter_proxy.py --port 8913 --label vision-evaluator --log native-e2e-meter/vision-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/vision-proxy.log 2>&1 & echo $! > native-e2e-meter/vision.pid
+          nohup python scripts/github_models_meter_proxy.py --port 8911 --label agent --log native-e2e-meter/agent.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/agent-proxy.log 2>&1 &
+          nohup python scripts/github_models_meter_proxy.py --port 8912 --label text-evaluator --log native-e2e-meter/text-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/text-proxy.log 2>&1 &
+          nohup python scripts/github_models_meter_proxy.py --port 8913 --label vision-evaluator --log native-e2e-meter/vision-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/vision-proxy.log 2>&1 &
           sleep 2
-          curl --fail --silent --show-error http://127.0.0.1:8911/models >/dev/null
+          curl -fsS http://127.0.0.1:8911/models >/dev/null
 
-      - name: Prove live local model inference and token usage
+      - name: Prove live local model inference
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8911/chat/completions \
             -H 'Content-Type: application/json' \
-            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":30}" \
+            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":40}" \
             | tee native-e2e-meter/model-smoke.json
           grep -q 'AGENCYBENCH_MODEL_READY' native-e2e-meter/model-smoke.json
 
-      - name: Route Backend scenario with AgentWeave
+      - name: Route full Backend scenario with AgentWeave
         run: |
           python scripts/agencybench_native_e2e.py route \
             --agencybench-root external/AgencyBench \
             --scenario Backend/scenario1 \
             --output agencybench-native-route.json
 
-      - name: Run full native Backend scenario1 with primary AgentWeave-selected agent
+      - name: Execute full 5-subtask Backend scenario
         shell: bash
         run: |
           set +e
           ROOT="$PWD"
           DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Backend/scenario1"
-          FAMILY=$(python - <<'PY'
-          import json
-          print(json.load(open('agencybench-native-route.json'))['selected_family'])
-          PY
-          )
+          FAMILY=$(python -c "import json; print(json.load(open('agencybench-native-route.json'))['selected_family'])")
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=420000
+          BRIDGE_TIMEOUT_MS=600000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously inside the assigned AgencyBench workspace. Use the available shell and file tools, compile and test repeatedly, preserve prior subtask work, and respond to evaluator feedback until the deliverables satisfy the task. Prefer direct implementation over long explanations.
-          SII_MAX_TURNS=80
+          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously in the workspace. Use shell and file tools, implement the requested software, compile and test it, preserve earlier subtask work, and repair failures using evaluator feedback. Prefer direct implementation over explanation.
+          SII_MAX_TURNS=100
           EOF
           START=$(date +%s)
-          (
-            cd "$DIR"
-            timeout 3000s python eval_task.py --env .env.agentweave --description description.json
-          ) 2>&1 | tee "$ROOT/backend-primary.log"
-          RC=${PIPESTATUS[0]}
-          END=$(date +%s)
-          echo "$RC" > "$ROOT/backend-primary.rc"
-          echo "$((END-START))" > "$ROOT/backend-primary.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen2.5-coder_3b' | head -1)
-          if [ -z "$META" ]; then META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | head -1); fi
-          if [ -n "$META" ]; then cp "$META" "$ROOT/backend-primary-meta.json"; fi
+          (cd "$DIR" && timeout 3300s python eval_task.py --env .env.agentweave --description description.json) 2>&1 | tee "$ROOT/backend-primary.log"
+          echo "${PIPESTATUS[0]}" > "$ROOT/backend-primary.rc"
+          echo "$(( $(date +%s) - START ))" > "$ROOT/backend-primary.seconds"
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_4b' | head -1)
+          [ -n "$META" ] && cp "$META" "$ROOT/backend-primary-meta.json"
           exit 0
 
-      - name: Decide and execute AgentWeave recovery re-route
+      - name: Recovery and re-routing with alternate agent
         shell: bash
         run: |
           set +e
@@ -132,66 +132,48 @@ jobs:
           NEED_RECOVERY=$(python - <<'PY'
           import json, pathlib
           p=pathlib.Path('backend-primary-meta.json')
-          if not p.exists():
-              print('yes'); raise SystemExit
-          m=json.load(p.open())
-          scores=[float(x.get('best_score') or 0) for x in m.get('subtasks',[])]
-          complete=len(scores) >= 5
-          mean=sum(scores)/len(scores) if scores else 0
-          print('yes' if (not complete or mean < 6.0) else 'no')
+          if not p.exists(): print('yes'); raise SystemExit
+          m=json.load(p.open()); s=[float(x.get('best_score') or 0) for x in m.get('subtasks',[])]
+          print('yes' if len(s)<5 or (sum(s)/len(s) if s else 0)<6 else 'no')
           PY
           )
           echo "$NEED_RECOVERY" > backend-recovery-triggered.txt
-          if [ "$NEED_RECOVERY" != "yes" ]; then
-            echo 'Primary completed with sufficient native score; fallback not needed.'
-            exit 0
-          fi
+          [ "$NEED_RECOVERY" = yes ] || exit 0
           DIR="$ROOT/external/AgencyBench/AgencyBench-v2/Backend/scenario1"
-          FAMILY=$(python - <<'PY'
-          import json
-          print(json.load(open('agencybench-native-route.json'))['selected_family'])
-          PY
-          )
+          FAMILY=$(python -c "import json; print(json.load(open('agencybench-native-route.json'))['selected_family'])")
           cat > "$DIR/.env.agentweave-fallback" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=420000
+          BRIDGE_TIMEOUT_MS=600000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${FALLBACK_MODEL}
-          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected by AgentWeave after the primary agent failed to reach the native AgencyBench acceptance threshold. Work autonomously with shell and file tools, compile and test every deliverable, and use native evaluator feedback to repair failures. Prefer direct implementation over long explanations.
-          SII_MAX_TURNS=80
+          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected after the first agent failed the native AgencyBench threshold. Use shell and file tools, compile and test every deliverable, and repair failures using the native evaluator feedback.
+          SII_MAX_TURNS=100
           EOF
           START=$(date +%s)
-          (
-            cd "$DIR"
-            timeout 1800s python eval_task.py --env .env.agentweave-fallback --description description.json
-          ) 2>&1 | tee "$ROOT/backend-fallback.log"
-          RC=${PIPESTATUS[0]}
-          END=$(date +%s)
-          echo "$RC" > "$ROOT/backend-fallback.rc"
-          echo "$((END-START))" > "$ROOT/backend-fallback.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen3_4b' | head -1)
-          if [ -z "$META" ]; then META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | tail -1); fi
-          if [ -n "$META" ]; then cp "$META" "$ROOT/backend-fallback-meta.json"; fi
+          (cd "$DIR" && timeout 2400s python eval_task.py --env .env.agentweave-fallback --description description.json) 2>&1 | tee "$ROOT/backend-fallback.log"
+          echo "${PIPESTATUS[0]}" > "$ROOT/backend-fallback.rc"
+          echo "$(( $(date +%s) - START ))" > "$ROOT/backend-fallback.seconds"
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen2.5-coder_3b' | head -1)
+          [ -n "$META" ] && cp "$META" "$ROOT/backend-fallback-meta.json"
           exit 0
 
       - name: Start official AgencyBench Docker sandbox
-        shell: bash
         run: |
           docker pull ghcr.io/agent-infra/sandbox:latest
           docker run --security-opt seccomp=unconfined --rm -d --name agencybench-sandbox -p 8080:8080 ghcr.io/agent-infra/sandbox:latest
           READY=no
           for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:8080 >/dev/null 2>&1; then READY=yes; break; fi
+            curl -fsS http://127.0.0.1:8080 >/dev/null 2>&1 && { READY=yes; break; }
             sleep 2
           done
           echo "$READY" > docker-sandbox-ready.txt
           test "$READY" = yes
           docker inspect agencybench-sandbox > docker-sandbox-inspect.json
 
-      - name: Run native Frontend Docker + text/vision judge smoke
+      - name: Execute Frontend native Docker text+vision judge smoke
         shell: bash
         run: |
           set +e
@@ -202,21 +184,22 @@ jobs:
           import json
           from pathlib import Path
           p=Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.json')
-          d=json.load(p.open())
-          p.write_text(json.dumps({'subtask_count':1,'subtask1':d['subtask1']},indent=2), encoding='utf-8')
+          d=json.load(p.open()); p.write_text(json.dumps({'subtask_count':1,'subtask1':d['subtask1']},indent=2))
           PY
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
           SANDBOX_BASE_URL=http://127.0.0.1:8080
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=420000
+          BRIDGE_TIMEOUT_MS=600000
           SANDBOX_TIMEOUT_SEC=90
+          SII_USERNAME=agentweave-local
+          SII_PASSWORD=agentweave-local
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable with shell and file tools, use browser-oriented evidence where appropriate, and repair the result from evaluator feedback. Prefer direct implementation over long explanations.
-          SII_MAX_TURNS=60
+          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable with the available tools and repair it using evaluator feedback.
+          SII_MAX_TURNS=80
           EVAL_TEXT_API_KEY=ollama-local
           EVAL_TEXT_API_BASE_URL=http://127.0.0.1:8912/v1
           EVAL_TEXT_MODEL=${FALLBACK_MODEL}
@@ -226,57 +209,47 @@ jobs:
           QWEN_VISION_API_KEY=ollama-local
           EOF
           START=$(date +%s)
-          (
-            cd "$DIR"
-            timeout 1500s python eval_task.py --env .env.agentweave
-          ) 2>&1 | tee "$ROOT/frontend-native.log"
-          RC=${PIPESTATUS[0]}
-          END=$(date +%s)
-          echo "$RC" > "$ROOT/frontend-native.rc"
-          echo "$((END-START))" > "$ROOT/frontend-native.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | head -1)
-          if [ -n "$META" ]; then cp "$META" "$ROOT/frontend-native-meta.json"; fi
+          (cd "$DIR" && timeout 1800s python eval_task.py --env .env.agentweave) 2>&1 | tee "$ROOT/frontend-native.log"
+          echo "${PIPESTATUS[0]}" > "$ROOT/frontend-native.rc"
+          echo "$(( $(date +%s) - START ))" > "$ROOT/frontend-native.seconds"
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_4b' | head -1)
+          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
+          [ -n "$META" ] && cp "$META" "$ROOT/frontend-native-meta.json"
           cp "$ROOT/frontend-description-original.json" "$DIR/description.json"
           exit 0
 
-      - name: Build measured native E2E report
+      - name: Build measured report
         shell: bash
         run: |
-          PRIMARY_SECONDS=$(cat backend-primary.seconds 2>/dev/null || echo 0)
-          FALLBACK_SECONDS=$(cat backend-fallback.seconds 2>/dev/null || echo 0)
-          FRONTEND_SECONDS=$(cat frontend-native.seconds 2>/dev/null || echo 0)
           ARGS=(report --route agencybench-native-route.json \
             --meter native-e2e-meter/agent.jsonl \
             --meter native-e2e-meter/text-evaluator.jsonl \
             --meter native-e2e-meter/vision-evaluator.jsonl \
-            --runtime backend_primary_seconds=${PRIMARY_SECONDS} \
-            --runtime backend_fallback_seconds=${FALLBACK_SECONDS} \
-            --runtime frontend_seconds=${FRONTEND_SECONDS})
+            --runtime backend_primary_seconds=$(cat backend-primary.seconds 2>/dev/null || echo 0) \
+            --runtime backend_fallback_seconds=$(cat backend-fallback.seconds 2>/dev/null || echo 0) \
+            --runtime frontend_seconds=$(cat frontend-native.seconds 2>/dev/null || echo 0))
           [ -f backend-primary-meta.json ] && ARGS+=(--backend-meta backend-primary-meta.json)
           [ -f backend-fallback-meta.json ] && ARGS+=(--backend-fallback-meta backend-fallback-meta.json)
           [ -f frontend-native-meta.json ] && ARGS+=(--frontend-meta frontend-native-meta.json)
           python scripts/agencybench_native_e2e.py "${ARGS[@]}"
           cat agencybench-native-e2e-results.md >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Validate actual native components executed
-        shell: bash
+      - name: Validate native evidence
         run: |
-          test -s native-e2e-meter/model-smoke.json
-          test -s native-e2e-meter/agent.jsonl
           test "$(cat docker-sandbox-ready.txt)" = yes
           test -s backend-primary-meta.json
           test -s frontend-native-meta.json
           python - <<'PY'
           import json
           r=json.load(open('agencybench-native-e2e-results.json'))
+          assert r['backend_primary']['subtasks'] == 5, r
+          assert r['frontend_docker_native_judge']['subtasks'] >= 1, r
           assert r['metering']['model_requests'] > 1, r
           assert r['metering']['total_tokens_reported'] > 0, r
-          assert r['backend_primary']['subtasks'] >= 1, r
-          assert r['frontend_docker_native_judge']['subtasks'] >= 1, r
-          print('Native AgencyBench execution, local model calls, token metering, Docker evidence and native judge artifacts are present.')
+          print('Native AgencyBench long-horizon, feedback/recovery, Docker/judges and metering evidence present.')
           PY
 
-      - name: Upload native AgencyBench evidence
+      - name: Upload native evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
