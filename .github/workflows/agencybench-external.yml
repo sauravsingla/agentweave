@@ -1,0 +1,54 @@
+name: AgencyBench External Capability Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agentweave/**'
+      - 'scripts/agencybench_external_eval.py'
+      - '.github/workflows/agencybench-external.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agencybench-routing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout AgentWeave
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned official AgencyBench descriptions
+        uses: actions/checkout@v5
+        with:
+          repository: GAIR-NLP/AgencyBench
+          ref: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
+          path: external/AgencyBench
+          sparse-checkout: |
+            AgencyBench-v2/*/scenario*/description.json
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install AgentWeave
+        run: pip install -e .
+
+      - name: Evaluate blind AgencyBench capability-family routing
+        run: |
+          python scripts/agencybench_external_eval.py --agencybench-root external/AgencyBench
+          cat agencybench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload AgencyBench evaluation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agencybench-external-routing-evaluation
+          path: |
+            agencybench-routing-results.json
+            agencybench-routing-results.md
+          if-no-files-found: error
