@@ -40,7 +40,10 @@ class AdversarialTestSuite:
             if k: groups.setdefault(k,[]).append(a.agent_id)
         return {k:v for k,v in groups.items() if len(v)>1}
     def sanitize_agent_card(self,card):
-        blocked=('ignore previous','ignore system','system prompt','exfiltrate','reveal secret')
+        blocked=(
+            'ignore previous','ignore system','ignore all validation','bypass validation',
+            'system prompt','exfiltrate','reveal secret','override policy','trust me'
+        )
         text=str(card).lower(); hits=[x for x in blocked if x in text]
         return {'passed':not hits,'hits':hits}
     async def timeout_test(self,invoke,agent,timeout=.05):

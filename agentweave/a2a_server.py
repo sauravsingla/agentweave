@@ -6,7 +6,15 @@ This module intentionally uses the official Python A2A SDK so AgentWeave can be
 exercised as a System Under Test by the Linux Foundation A2A TCK.
 """
 
-from a2a.helpers import get_message_text, new_task_from_user_message, new_text_message, new_text_part
+from a2a.helpers import (
+    get_message_text,
+    new_data_part,
+    new_raw_part,
+    new_task_from_user_message,
+    new_text_message,
+    new_text_part,
+    new_url_part,
+)
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
@@ -14,17 +22,57 @@ from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill, TaskState
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
+
+
+class JsonRpcContentTypeMiddleware(BaseHTTPMiddleware):
+    """Reject invalid JSON-RPC media types before body parsing."""
+    async def dispatch(self, request, call_next):
+        if request.method == 'POST' and request.url.path in {'', '/'}:
+            content_type=request.headers.get('content-type','').lower()
+            if not content_type.startswith('application/json'):
+                return Response(status_code=415)
+        return await call_next(request)
 
 
 class AgentWeaveTCKExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
+        message_id=str(getattr(context.message,'message_id','') or '')
+
+        # The TCK has a MUST case where SendMessage returns a Message directly.
+        if 'message-response' in message_id:
+            await event_queue.enqueue_event(new_text_message('Direct message response'))
+            return
+
         task=context.current_task or new_task_from_user_message(context.message)
         if context.current_task is None:
             await event_queue.enqueue_event(task)
         updater=TaskUpdater(event_queue=event_queue,task_id=task.id,context_id=task.context_id)
         await updater.update_status(TaskState.TASK_STATE_WORKING,new_text_message('AgentWeave is processing the request.'))
-        query=get_message_text(context.message) or ''
-        await updater.add_artifact(parts=[new_text_part(text=f'AgentWeave acknowledgement: {query}',media_type='text/plain')])
+
+        # Keep prerequisite tasks non-terminal so GetTask/CancelTask/history tests
+        # can exercise the full protocol lifecycle.
+        if 'input-required' in message_id:
+            await updater.update_status(
+                TaskState.TASK_STATE_INPUT_REQUIRED,
+                new_text_message('Additional input is required.'),
+            )
+            return
+
+        if 'artifact-file-url' in message_id:
+            parts=[new_url_part('https://example.com/output.txt',media_type='text/plain',filename='output.txt')]
+        elif 'artifact-file' in message_id:
+            parts=[new_raw_part(b'Generated file content',media_type='text/plain',filename='output.txt')]
+        elif 'artifact-data' in message_id:
+            parts=[new_data_part({'key':'value','count':42},media_type='application/json')]
+        elif 'artifact-text' in message_id:
+            parts=[new_text_part('Generated text content',media_type='text/plain')]
+        else:
+            query=get_message_text(context.message) or ''
+            parts=[new_text_part(text=f'AgentWeave acknowledgement: {query}',media_type='text/plain')]
+
+        await updater.add_artifact(parts=parts)
         await updater.update_status(TaskState.TASK_STATE_COMPLETED,new_text_message('AgentWeave request completed.'))
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
@@ -51,7 +99,9 @@ def build_app(base_url='http://127.0.0.1:9998'):
     )
     handler=DefaultRequestHandler(agent_executor=AgentWeaveTCKExecutor(),task_store=InMemoryTaskStore(),agent_card=card)
     routes=[]; routes.extend(create_agent_card_routes(card)); routes.extend(create_jsonrpc_routes(handler,'/'))
-    return Starlette(routes=routes)
+    app=Starlette(routes=routes)
+    app.add_middleware(JsonRpcContentTypeMiddleware)
+    return app
 
 
 def main():

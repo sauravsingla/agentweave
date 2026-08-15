@@ -1,12 +1,14 @@
 from __future__ import annotations
 import json, sqlite3
-from pathlib import Path
 from .models import AgentProfile, Capability, TrustVector, ExecutionProfile
 
 class ReputationStore:
     def __init__(self,path='agentweave.db'):
-        self.path=str(path); self._init()
-    def _conn(self): return sqlite3.connect(self.path)
+        self.path=str(path)
+        self._memory_conn=sqlite3.connect(':memory:') if self.path == ':memory:' else None
+        self._init()
+    def _conn(self):
+        return self._memory_conn if self._memory_conn is not None else sqlite3.connect(self.path)
     def _init(self):
         with self._conn() as c:
             c.execute('create table if not exists agents (agent_id text primary key, payload text not null)')
