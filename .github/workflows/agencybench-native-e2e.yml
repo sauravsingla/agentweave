@@ -14,11 +14,11 @@ permissions:
 jobs:
   native-e2e:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 90
     env:
       AGENCYBENCH_PIN: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
-      PRIMARY_MODEL: qwen3:4b
-      FALLBACK_MODEL: qwen2.5-coder:3b
+      PRIMARY_MODEL: qwen3:1.7b
+      FALLBACK_MODEL: qwen2.5-coder:1.5b
       VISION_MODEL: qwen3-vl:2b
     steps:
       - name: Checkout AgentWeave
@@ -95,7 +95,7 @@ jobs:
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8911/chat/completions \
             -H 'Content-Type: application/json' \
-            -d "{\"model\":\"${FALLBACK_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":80}" \
+            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":80}" \
             | tee native-e2e-meter/model-smoke.json
           grep -q 'AGENCYBENCH_MODEL_READY' native-e2e-meter/model-smoke.json
 
@@ -116,19 +116,20 @@ jobs:
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=600000
+          BRIDGE_TIMEOUT_MS=300000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
           SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously in the workspace. Use shell and file tools, implement the requested software, compile and test it, preserve earlier subtask work, and repair failures using evaluator feedback. Prefer direct implementation over explanation.
-          SII_MAX_TURNS=100
+          SII_MAX_TURNS=24
           EOF
           START=$(date +%s)
-          (cd "$DIR" && timeout 3300s python eval_task.py --env .env.agentweave --description description.json) 2>&1 | tee "$ROOT/backend-primary.log"
+          (cd "$DIR" && timeout 1800s python eval_task.py --env .env.agentweave --description description.json) 2>&1 | tee "$ROOT/backend-primary.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/backend-primary.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/backend-primary.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_4b' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_1.7b' | head -1)
+          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
           [ -n "$META" ] && cp "$META" "$ROOT/backend-primary-meta.json"
           exit 0
 
@@ -152,19 +153,20 @@ jobs:
           cat > "$DIR/.env.agentweave-fallback" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=600000
+          BRIDGE_TIMEOUT_MS=300000
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${FALLBACK_MODEL}
           SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected after the first agent failed the native AgencyBench threshold. Use shell and file tools, compile and test every deliverable, and repair failures using the native evaluator feedback.
-          SII_MAX_TURNS=100
+          SII_MAX_TURNS=24
           EOF
           START=$(date +%s)
-          (cd "$DIR" && timeout 2400s python eval_task.py --env .env.agentweave-fallback --description description.json) 2>&1 | tee "$ROOT/backend-fallback.log"
+          (cd "$DIR" && timeout 1200s python eval_task.py --env .env.agentweave-fallback --description description.json) 2>&1 | tee "$ROOT/backend-fallback.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/backend-fallback.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/backend-fallback.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen2.5-coder_3b' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen2.5-coder_1.5b' | head -1)
+          [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
           [ -n "$META" ] && cp "$META" "$ROOT/backend-fallback-meta.json"
           exit 0
 
@@ -198,7 +200,7 @@ jobs:
           CONDA_ENV_NAME=
           SANDBOX_BASE_URL=http://127.0.0.1:8080
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=600000
+          BRIDGE_TIMEOUT_MS=300000
           SANDBOX_TIMEOUT_SEC=90
           SII_USERNAME=agentweave-local
           SII_PASSWORD=agentweave-local
@@ -207,7 +209,7 @@ jobs:
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
           SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable with the available tools and repair it using evaluator feedback.
-          SII_MAX_TURNS=80
+          SII_MAX_TURNS=20
           EVAL_TEXT_API_KEY=ollama-local
           EVAL_TEXT_API_BASE_URL=http://127.0.0.1:8912/v1
           EVAL_TEXT_MODEL=${FALLBACK_MODEL}
@@ -217,10 +219,10 @@ jobs:
           QWEN_VISION_API_KEY=ollama-local
           EOF
           START=$(date +%s)
-          (cd "$DIR" && timeout 1800s python eval_task.py --env .env.agentweave) 2>&1 | tee "$ROOT/frontend-native.log"
+          (cd "$DIR" && timeout 1200s python eval_task.py --env .env.agentweave) 2>&1 | tee "$ROOT/frontend-native.log"
           echo "${PIPESTATUS[0]}" > "$ROOT/frontend-native.rc"
           echo "$(( $(date +%s) - START ))" > "$ROOT/frontend-native.seconds"
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_4b' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | grep -F 'qwen3_1.7b' | head -1)
           [ -z "$META" ] && META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' | head -1)
           [ -n "$META" ] && cp "$META" "$ROOT/frontend-native-meta.json"
           cp "$ROOT/frontend-description-original.json" "$DIR/description.json"
