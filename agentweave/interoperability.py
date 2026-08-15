@@ -17,6 +17,7 @@ class InteropTarget:
     params: dict|None=None
     headers: dict|None=None
     bootstrap: dict|None=None
+    http_bootstrap: dict|None=None
 
 @dataclass
 class InteropResult:
@@ -38,8 +39,45 @@ def _dig(obj,path):
         cur=cur[part]
     return cur
 
+
+def _find_key(obj,names):
+    wanted={str(x).lower() for x in names}
+    if isinstance(obj,dict):
+        for k,v in obj.items():
+            if str(k).lower() in wanted and isinstance(v,(str,int,float)) and str(v): return v
+        for v in obj.values():
+            found=_find_key(v,wanted)
+            if found is not None: return found
+    elif isinstance(obj,list):
+        for v in obj:
+            found=_find_key(v,wanted)
+            if found is not None: return found
+    return None
+
+
+def _capture_value(obj,spec):
+    candidates=spec if isinstance(spec,list) else [spec]
+    for path in candidates:
+        value=_dig(obj,path)
+        if value is not None: return value
+    leaf_names=[str(x).split('.')[-1] for x in candidates]
+    return _find_key(obj,leaf_names)
+
 class A2AInteropSuite:
     def __init__(self,adapter=None): self.discovery=AgentCardDiscovery(); self.adapter=adapter or HttpA2AAdapter()
+
+    async def _http_bootstrap(self,target,runtime_headers):
+        boot=target.http_bootstrap or {}
+        method=str(boot.get('method','POST')).upper(); url=boot['url']; body=boot.get('json')
+        async with httpx.AsyncClient(timeout=30,follow_redirects=True) as client:
+            r=await client.request(method,url,json=body,headers={'Content-Type':'application/json',**(boot.get('headers') or {})})
+            r.raise_for_status(); data=r.json()
+        for header,spec in (boot.get('capture_headers') or {}).items():
+            value=_capture_value(data,spec)
+            if value is None:
+                raise RuntimeError(f'HTTP bootstrap response missing required credential for {header}')
+            runtime_headers[header]=str(value)
+
     async def run_target(self,target:InteropTarget,prompt='A2A interoperability test'):
         started=time.perf_counter(); agent=None
         try:
@@ -49,12 +87,14 @@ class A2AInteropSuite:
         transport=str(agent.metadata.get('protocol_binding') or 'JSONRPC')
         try:
             runtime_headers=dict(target.headers or {})
+            if target.http_bootstrap:
+                await self._http_bootstrap(target,runtime_headers)
             if target.bootstrap:
                 boot=target.bootstrap
                 result=await self.adapter.rpc_call(agent,boot['method'],boot.get('params') or {},extra_headers=runtime_headers)
-                for header,path in (boot.get('capture_headers') or {}).items():
-                    value=_dig(result,path)
-                    if value is None: raise RuntimeError(f'Bootstrap response missing {path} required for {header}')
+                for header,spec in (boot.get('capture_headers') or {}).items():
+                    value=_capture_value(result,spec)
+                    if value is None: raise RuntimeError(f'Bootstrap response missing required credential for {header}')
                     runtime_headers[header]=str(value)
             if target.message is not None:
                 await self.adapter.invoke_message(agent,target.message,rpc_method=target.rpc_method,context={'test':'agentweave-interop','implementation':target.implementation},content_type=target.content_type,extra_params=target.params,extra_headers=runtime_headers)
