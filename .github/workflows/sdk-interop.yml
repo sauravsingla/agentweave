@@ -1,0 +1,134 @@
+name: A2A SDK Interoperability Proof
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sdk-interop:
+    name: ${{ matrix.language }} ↔ AgentWeave
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            repository: a2aproject/a2a-samples
+            sample_dir: samples/python/agents/helloworld
+            implementation: a2a-python
+          - language: go
+            repository: a2aproject/a2a-samples
+            sample_dir: samples/go/agents/helloworld
+            implementation: a2a-go
+          - language: javascript
+            repository: a2aproject/a2a-samples
+            sample_dir: samples/js/agents/helloworld
+            implementation: a2a-js
+          - language: java
+            repository: a2aproject/a2a-java
+            sample_dir: examples/helloworld/server
+            implementation: a2a-java
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repository }}
+          path: upstream
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-go@v6
+        if: matrix.language == 'go'
+        with:
+          go-version: '1.25.x'
+      - uses: actions/setup-node@v5
+        if: matrix.language == 'javascript'
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v5
+        if: matrix.language == 'java'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Install AgentWeave
+        run: pip install -e .[dev]
+      - name: Install and launch upstream SDK agent
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd "upstream/${{ matrix.sample_dir }}"
+          case "${{ matrix.language }}" in
+            python)
+              pip install -r requirements.txt
+              nohup python __main__.py > /tmp/a2a-server.log 2>&1 &
+              ;;
+            go)
+              go mod download
+              sed -i 's/runInteractiveClient()/select {}/' main.go
+              nohup go run . > /tmp/a2a-server.log 2>&1 &
+              ;;
+            javascript)
+              npm ci
+              nohup npm start > /tmp/a2a-server.log 2>&1 &
+              ;;
+            java)
+              cd ../../..
+              mvn -q install -DskipTests
+              cd examples/helloworld/server
+              nohup mvn -q quarkus:dev -Dquarkus.otel.sdk.disabled=true > /tmp/a2a-server.log 2>&1 &
+              ;;
+          esac
+      - name: Wait for Agent Card
+        shell: bash
+        run: |
+          for i in $(seq 1 150); do
+            if curl -fsS http://127.0.0.1:9999/.well-known/agent-card.json > /tmp/agent-card.json; then
+              cat /tmp/agent-card.json
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/a2a-server.log || true
+          exit 1
+      - name: Prove AgentWeave discovery and invocation
+        run: |
+          python scripts/prove_sdk_interop.py \
+            --name '${{ matrix.language }}-helloworld' \
+            --implementation '${{ matrix.implementation }}' \
+            --card-url 'http://127.0.0.1:9999/.well-known/agent-card.json' \
+            --output 'interop-results/${{ matrix.language }}.json'
+      - name: Server log
+        if: always()
+        run: tail -200 /tmp/a2a-server.log || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interop-${{ matrix.language }}
+          path: interop-results/${{ matrix.language }}.json
+          if-no-files-found: warn
+
+  compatibility-matrix:
+    needs: sdk-interop
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: interop-*
+          path: interop-results
+          merge-multiple: true
+      - name: Publish compatibility matrix
+        run: |
+          python scripts/render_interop_matrix.py interop-results > compatibility-matrix.md
+          cat compatibility-matrix.md
+          cat compatibility-matrix.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agentweave-a2a-compatibility-matrix
+          path: |
+            compatibility-matrix.md
+            interop-results/*.json
