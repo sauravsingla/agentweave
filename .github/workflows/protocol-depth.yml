@@ -1,0 +1,21 @@
+name: Protocol Depth Proof
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  grpc-push-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -e '.[grpc,api]'
+      - run: python scripts/protocol_depth_proof.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: protocol-depth-proof
+          path: protocol-depth-proof.json

@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+title: AgentWeave
+message: If you use AgentWeave in research, please cite this repository and the release version used.
+type: software
+authors:
+  - family-names: Singla
+    given-names: Saurav
+repository-code: https://github.com/sauravsingla/agentweave
+license: Apache-2.0
+version: 0.6.0
+date-released: 2026-08-15
+keywords:
+  - multi-agent systems
+  - A2A
+  - agent interoperability
+  - agent orchestration
+  - trustworthy AI

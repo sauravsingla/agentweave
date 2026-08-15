@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      publish_pypi:
+        description: Publish to PyPI using trusted publishing
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+
+jobs:
+  build-test-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install build and test dependencies
+        run: python -m pip install -U pip build twine && pip install -e '.[dev]'
+      - name: Test
+        run: pytest -q
+      - name: Build distributions
+        run: python -m build
+      - name: Validate distributions
+        run: twine check dist/*
+      - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          python - <<'PY'
+          import pathlib,re
+          text=pathlib.Path('pyproject.toml').read_text()
+          version=re.search(r'^version = "([^"]+)"',text,re.M).group(1)
+          tag='${{ github.ref_name }}'
+          assert tag == 'v'+version, f'tag {tag} does not match package v{version}'
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create '${{ github.ref_name }}' dist/* --generate-notes --title 'AgentWeave ${{ github.ref_name }}'
+      - name: Publish to PyPI
+        if: startsWith(github.ref, 'refs/tags/') || inputs.publish_pypi
+        uses: pypa/gh-action-pypi-publish@release/v1

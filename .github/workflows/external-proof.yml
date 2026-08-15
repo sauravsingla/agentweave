@@ -1,0 +1,62 @@
+name: External Environment Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_hosted_a2a:
+        description: Run independently hosted A2A targets from repository secret
+        required: false
+        default: true
+        type: boolean
+      run_marketplaces:
+        description: Run configured AWS/Foundry/Google marketplace proof
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  external-a2a:
+    if: ${{ inputs.run_hosted_a2a }}
+    runs-on: ubuntu-latest
+    env:
+      AGENTWEAVE_EXTERNAL_A2A_TARGETS: ${{ secrets.AGENTWEAVE_EXTERNAL_A2A_TARGETS }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -e .
+      - run: python scripts/external_a2a_proof.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independently-hosted-a2a-proof
+          path: external-a2a-proof.json
+          if-no-files-found: warn
+
+  real-marketplaces:
+    if: ${{ inputs.run_marketplaces }}
+    runs-on: ubuntu-latest
+    env:
+      AGENTWEAVE_REQUIRE_LIVE_PROOF: '1'
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      AZURE_FOUNDRY_ENDPOINT: ${{ secrets.AZURE_FOUNDRY_ENDPOINT }}
+      AZURE_FOUNDRY_TOKEN: ${{ secrets.AZURE_FOUNDRY_TOKEN }}
+      AZURE_FOUNDRY_API_VERSION: ${{ secrets.AZURE_FOUNDRY_API_VERSION }}
+      GOOGLE_A2A_AGENT_CARDS: ${{ secrets.GOOGLE_A2A_AGENT_CARDS }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -e '.[aws]'
+      - run: python scripts/production_proof.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: credentialed-marketplace-proof
+          path: proof-results.json
+          if-no-files-found: warn

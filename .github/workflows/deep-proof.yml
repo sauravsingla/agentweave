@@ -5,11 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      full_scale:
-        description: Run physical 10K/100K/1M benchmark
-        required: false
-        default: false
-        type: boolean
       run_external_marketplaces:
         description: Exercise configured real marketplace credentials/card URLs
         required: false
@@ -18,7 +13,7 @@ on:
 
 jobs:
   a2a-tck:
-    name: A2A lifecycle + official TCK
+    name: A2A lifecycle + official JSON-RPC TCK
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -26,37 +21,29 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Install AgentWeave A2A SUT
-        run: pip install -e '.[dev,tck]'
-      - name: Start AgentWeave A2A server
-        run: nohup python -m agentweave.a2a_server > /tmp/agentweave-a2a.log 2>&1 &
+      - run: pip install -e '.[dev,tck,grpc,api]'
+      - run: nohup python -m agentweave.a2a_server > /tmp/agentweave-a2a.log 2>&1 &
       - name: Wait for Agent Card
         run: |
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:9998/.well-known/agent-card.json && exit 0; sleep 1; done
           cat /tmp/agentweave-a2a.log; exit 1
-      - name: Exercise AgentWeave lifecycle client
+      - name: Exercise lifecycle
         run: |
           python - <<'PY'
           import asyncio
-          from agentweave import AgentCardDiscovery, LongRunningA2AClient
+          from agentweave import AgentCardDiscovery,LongRunningA2AClient
           async def main():
-              a=await AgentCardDiscovery().fetch('http://127.0.0.1:9998/.well-known/agent-card.json')
-              c=LongRunningA2AClient(max_retries=0)
-              s=await c.send(a,'AgentWeave lifecycle proof')
-              assert s.result
-              events=[]
-              async for e in c.stream(a,'AgentWeave streaming proof'): events.append(e)
-              assert events
-              print({'send_status':s.status,'stream_events':len(events)})
+              a=await AgentCardDiscovery().fetch('http://127.0.0.1:9998/.well-known/agent-card.json'); c=LongRunningA2AClient(max_retries=0)
+              state=await c.send(a,'AgentWeave lifecycle proof'); assert state.result
+              events=[e async for e in c.stream(a,'AgentWeave streaming proof')]; assert events
           asyncio.run(main())
           PY
-      - name: Install official Linux Foundation A2A TCK
+      - name: Install official A2A TCK
         run: |
           git clone --depth=1 https://github.com/a2aproject/a2a-tck.git /tmp/a2a-tck
           python -m pip install uv
           cd /tmp/a2a-tck && uv venv && uv pip install -e .
-      - name: Run MUST-level JSON-RPC conformance
-        run: cd /tmp/a2a-tck && uv run ./run_tck.py --sut-host http://127.0.0.1:9998 --transport jsonrpc --level must
+      - run: cd /tmp/a2a-tck && uv run ./run_tck.py --sut-host http://127.0.0.1:9998 --transport jsonrpc --level must
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -64,23 +51,40 @@ jobs:
           path: /tmp/a2a-tck/reports
 
   adversarial-sandbox:
-    name: Adversarial + sandbox proof
+    name: Red-team + Docker/Bubblewrap sandbox proof
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - run: pip install -e .[dev]
+      - run: pip install -e '.[dev,security]'
+      - run: sudo apt-get update -qq && sudo apt-get install -y bubblewrap
       - run: docker pull python:3.11-alpine
       - run: python scripts/security_proof.py
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: security-proof
           path: security-report.json
 
+  identity-proof:
+    name: Identity VC revocation KMS attestation proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -e '.[security]'
+      - run: python scripts/identity_proof.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: identity-proof
+          path: identity-proof.json
+
   postgres-proof:
-    name: PostgreSQL deployment proof
+    name: PostgreSQL concurrency recovery replication audit proof
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -89,8 +93,7 @@ jobs:
           POSTGRES_USER: agentweave
           POSTGRES_PASSWORD: agentweave
           POSTGRES_DB: agentweave
-        ports:
-          - 5432:5432
+        ports: ['5432:5432']
         options: >-
           --health-cmd "pg_isready -U agentweave"
           --health-interval 5s
@@ -98,67 +101,92 @@ jobs:
           --health-retries 10
     env:
       AGENTWEAVE_POSTGRES_DSN: postgresql://agentweave:agentweave@127.0.0.1:5432/agentweave
-      AGENTWEAVE_REQUIRE_LIVE_PROOF: '1'
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - run: pip install -e '.[postgres]'
-      - run: python scripts/production_proof.py
+      - run: python scripts/storage_proof.py
       - uses: actions/upload-artifact@v4
         with:
-          name: postgres-deployment-proof
-          path: proof-results.json
+          name: postgres-durability-proof
+          path: storage-proof.json
+
+  reliability-chaos:
+    name: Reliability and chaos proof
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: '3.11'}
+      - run: pip install -e .[dev]
+      - run: python scripts/chaos_proof.py
+      - uses: actions/upload-artifact@v4
+        with: {name: chaos-proof, path: chaos-proof.json}
+
+  governance:
+    name: Governance policy scenarios
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: '3.11'}
+      - run: pip install -e .
+      - run: python scripts/governance_proof.py
+      - uses: actions/upload-artifact@v4
+        with: {name: governance-proof, path: governance-proof.json}
+
+  result-verification:
+    name: Result verification quality and calibration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: {python-version: '3.11'}
+      - run: pip install -e .
+      - run: python scripts/verification_proof.py
+      - uses: actions/upload-artifact@v4
+        with: {name: result-verification-proof, path: verification-proof.json}
 
   research-evaluation:
-    name: Research baselines + ablations
+    name: Research baselines ablations tables plot
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - run: pip install -e .[dev]
       - run: python scripts/research_evaluation.py
+      - run: cat research-evaluation.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
-          name: research-evaluation
-          path: research-evaluation.json
-
-  scale-smoke:
-    name: 10K scale + C++/Python benchmark
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
-      - run: python -m pip install pybind11 && pip install -e .[dev]
-      - run: cmake -S cpp -B cpp/build -DAGENTWEAVE_BUILD_PYBIND=ON -Dpybind11_DIR=$(python -m pybind11 --cmakedir) && cmake --build cpp/build --config Release
-      - run: PYTHONPATH=cpp/build python scripts/scale_suite.py --sizes 10000
-      - uses: actions/upload-artifact@v4
-        with:
-          name: scale-smoke
-          path: scale-results.json
+          name: research-publication-package
+          path: |
+            research-evaluation.json
+            research-evaluation.csv
+            research-evaluation.md
+            research-coverage.svg
+            research/METHODOLOGY.md
+            research/benchmark_cases.json
 
   full-scale:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.full_scale }}
-    name: Physical 10K 100K 1M scale benchmark
+    name: Physical 10K 100K 1M scale + C++ benchmark
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - run: python -m pip install pybind11 && pip install -e .[dev]
       - run: cmake -S cpp -B cpp/build -DAGENTWEAVE_BUILD_PYBIND=ON -Dpybind11_DIR=$(python -m pybind11 --cmakedir) && cmake --build cpp/build --config Release
       - run: PYTHONPATH=cpp/build python scripts/scale_suite.py --sizes 10000,100000,1000000
+      - run: cat scale-results.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: physical-scale-10k-100k-1m
-          path: scale-results.json
+          path: |
+            scale-results.json
+            scale-results.md
 
   external-marketplaces:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_external_marketplaces }}
@@ -177,8 +205,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
-        with:
-          python-version: '3.11'
+        with: {python-version: '3.11'}
       - run: pip install -e '.[aws]'
       - run: python scripts/production_proof.py
       - uses: actions/upload-artifact@v4
@@ -186,3 +213,4 @@ jobs:
         with:
           name: real-marketplace-proof
           path: proof-results.json
+          if-no-files-found: warn

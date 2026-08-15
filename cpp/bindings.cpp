@@ -11,9 +11,10 @@ PYBIND11_MODULE(_agentweave_core,m){
     .def_readwrite("trust",&agentweave::Candidate::trust)
     .def_readwrite("placement",&agentweave::Candidate::placement);
   py::class_<agentweave::Ranked>(m,"Ranked")
-    .def_readonly("id",&agentweave::Ranked::id)
-    .def_readonly("score",&agentweave::Ranked::score)
-    .def_readonly("matched",&agentweave::Ranked::matched);
+    .def(py::init<>())
+    .def_readwrite("id",&agentweave::Ranked::id)
+    .def_readwrite("score",&agentweave::Ranked::score)
+    .def_readwrite("matched",&agentweave::Ranked::matched);
   m.def("rank",&agentweave::rank);
   m.def("select_team",&agentweave::select_team,py::arg("required"),py::arg("ranked"),py::arg("max_agents")=5);
 }

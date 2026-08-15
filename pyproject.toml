@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentweave"
-version = "0.5.0"
+version = "0.6.0"
 description = "Knowledge-, capability-, trust-, policy-, and resource-aware framework for discovering, validating, selecting, and orchestrating heterogeneous AI agents across cloud, marketplaces, enterprise, and edge environments."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -16,15 +16,17 @@ dependencies = [
 
 [project.optional-dependencies]
 security = ["PyJWT[crypto]>=2.9", "cryptography>=42"]
-api = ["fastapi>=0.115", "uvicorn>=0.30"]
+api = ["fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30"]
 tck = ["a2a-sdk==1.1.0", "starlette>=0.41", "uvicorn>=0.30", "sse-starlette>=2.1"]
+grpc = ["grpcio>=1.70", "protobuf>=5.28"]
 native = ["pybind11>=2.13"]
 postgres = ["psycopg[binary]>=3.2"]
 aws = ["boto3>=1.35"]
 observability = ["opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27"]
 edge = ["psutil>=6"]
 yaml = ["PyYAML>=6"]
-all = ["PyJWT[crypto]>=2.9", "cryptography>=42", "fastapi>=0.115", "uvicorn>=0.30", "a2a-sdk==1.1.0", "starlette>=0.41", "sse-starlette>=2.1", "pybind11>=2.13", "psycopg[binary]>=3.2", "boto3>=1.35", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27", "psutil>=6", "PyYAML>=6"]
+ontology = ["rdflib>=7.1"]
+all = ["PyJWT[crypto]>=2.9", "cryptography>=42", "fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30", "a2a-sdk==1.1.0", "sse-starlette>=2.1", "grpcio>=1.70", "protobuf>=5.28", "pybind11>=2.13", "psycopg[binary]>=3.2", "boto3>=1.35", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27", "psutil>=6", "PyYAML>=6", "rdflib>=7.1"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
@@ -35,9 +37,9 @@ agentweave-a2a-sut = "agentweave.a2a_server:main"
 
 [tool.setuptools.packages.find]
 include = ["agentweave*"]
-exclude = ["cpp*", "tests*", "examples*", "benchmarks*"]
+exclude = ["cpp*", "tests*", "examples*", "benchmarks*", "research*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = ["integration: requires live external services or hardware", "scale: large scalability benchmark"]
+markers = ["integration: requires live external services or hardware", "scale: large scalability benchmark", "external: requires independently hosted endpoint or cloud credentials"]

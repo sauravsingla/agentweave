@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: agentweave
+      POSTGRES_PASSWORD: agentweave
+      POSTGRES_DB: agentweave
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentweave"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - agentweave-postgres:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - agentweave-ollama:/root/.ollama
+
+volumes:
+  agentweave-postgres:
+  agentweave-ollama:

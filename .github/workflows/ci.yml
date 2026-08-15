@@ -14,6 +14,7 @@ jobs:
           python-version: '3.11'
       - run: pip install -e .[dev]
       - run: pytest -q
+      - run: agentweave version
 
   build-cpp:
     runs-on: ubuntu-latest
@@ -25,4 +26,26 @@ jobs:
       - run: python -m pip install pybind11
       - run: cmake -S cpp -B cpp/build -DAGENTWEAVE_BUILD_PYBIND=ON -Dpybind11_DIR=$(python -m pybind11 --cmakedir)
       - run: cmake --build cpp/build --config Release
-      - run: PYTHONPATH=cpp/build python -c "import _agentweave_core as c; x=c.Candidate(); x.id='a'; x.capabilities=['analysis']; print(c.rank(['analysis'],[x])[0].id)"
+      - name: Exercise native rank and team selection
+        run: |
+          PYTHONPATH=cpp/build python - <<'PY'
+          import _agentweave_core as c
+          a=c.Candidate(); a.id='a'; a.capabilities=['analysis']
+          b=c.Candidate(); b.id='b'; b.capabilities=['research']
+          ranked=c.rank(['analysis','research'],[a,b])
+          assert {x.id for x in ranked}=={'a','b'}
+          team=c.select_team(['analysis','research'],ranked,2)
+          assert set(team)=={'a','b'}
+          print({'ranked':[x.id for x in ranked],'team':team})
+          PY
+
+  package-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: twine check dist/*
