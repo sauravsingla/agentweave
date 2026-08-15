@@ -152,7 +152,11 @@ def _meter_summary(paths: list[Path]) -> dict[str, Any]:
         "tools_offered_across_requests": tools_offered,
         "upstream_request_wall_seconds": wall_ms / 1000.0,
         "monetary_cost_usd": 0.0,
-        "cost_note": "Models execute locally in Ollama on the GitHub-hosted runner, so there is no external per-token API charge in this proof. Runner/computing opportunity cost is not converted into a fabricated dollar amount.",
+        "cost_note": (
+            "Models execute locally in Ollama on the GitHub-hosted runner, so there is no external "
+            "per-token API charge in this proof. Runner/computing opportunity cost is not converted "
+            "into a fabricated dollar amount."
+        ),
     }
 
 
@@ -172,25 +176,55 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
 
     recovery_triggered = bool(fallback.get("available"))
     result = {
-        "protocol": "AgencyBench native representative end-to-end proof: full Backend/scenario1 (5 sequential subtasks) plus Frontend/scenario1 subtask-1 official Docker/browser/text+vision judge smoke. Local open models execute the live agent and evaluator requests; upstream AgencyBench eval_task.py provides native tools, execution, rubric scoring and feedback/retry loops.",
+        "protocol": (
+            "AgencyBench native representative proof: AgentWeave routes Backend/scenario1, one live SII "
+            "cumulative implementation pass builds a final workspace covering all five visible Backend "
+            "requirements, and the pinned upstream evaluator scores that workspace against all five native "
+            "subtask contracts. Frontend/scenario1 subtask1 separately exercises the official Docker/browser "
+            "judge path."
+        ),
         "routing": route,
         "backend_primary": primary,
         "backend_fallback": fallback,
         "frontend_docker_native_judge": frontend,
         "recovery": {
             "triggered": recovery_triggered,
-            "policy": "If primary Backend/scenario1 mean native score < 6 or execution is incomplete, rerun the same full scenario with the alternate candidate model and the same native AgencyBench judge contract.",
+            "policy": (
+                "If primary Backend/scenario1 mean native score < 6 or five-contract evaluation is incomplete, "
+                "build a new cumulative workspace with the alternate candidate model and score it against the "
+                "same five pinned native contracts."
+            ),
         },
         "metering": meter,
         "runtime": runtime,
         "boundaries": [
-            "Backend/scenario1 is the complete five-subtask upstream long-horizon scenario; this is a representative native slice, not the entire 138-task AgencyBench suite.",
-            "Frontend/scenario1 is intentionally limited to subtask1 to exercise the official Docker sandbox, browser evidence collection, text judge, vision judge, and evaluator-feedback retry loop without claiming a complete Frontend scenario score.",
-            "Agent and evaluator calls are live local Ollama inference requests using open models, not synthetic/prewritten outputs.",
-            "The AgencyBench scripts provide the available shell/file/browser tool environment and native rubric feedback. The measured model tool-call field counts tool_call objects exposed by the OpenAI-compatible model API; AgencyBench-side command/tool activity is also preserved in meta_eval artifacts.",
-            "AgencyBench native meta_eval scores are reported as produced; low scores remain valid benchmark outcomes and do not get rewritten into infrastructure success.",
-            "Monetary model API cost is $0 for local inference; runner cost is not invented or inferred from GitHub-hosted billing metadata.",
-            "This proof exercises AgencyBench evaluator-driven user-feedback/self-correction. It does not claim a separate hidden human user or an additional user-simulator implementation beyond what the pinned upstream scenario exposes.",
+            (
+                "Backend/scenario1 uses all five upstream requirements and all five pinned native rubric contracts. "
+                "To remain bounded on a CPU-only hosted runner, the agent produces one cumulative final workspace; "
+                "this does not claim five separate SII agent conversations."
+            ),
+            (
+                "The five Backend scores are produced by the upstream AgencyBench evaluator in --eval-only mode "
+                "from copies of that cumulative workspace; low scores remain benchmark outcomes and are not rewritten."
+            ),
+            (
+                "Frontend/scenario1 is intentionally limited to subtask1 to exercise the official Docker sandbox "
+                "and native frontend evaluation path without claiming a complete Frontend scenario score."
+            ),
+            (
+                "Metered OpenAI-compatible request/token/tool-call counts include only traffic that actually traverses "
+                "the local proxy. SII CLI task tool execution is evidenced separately by its native logs and is not "
+                "assumed to traverse that proxy."
+            ),
+            (
+                "The controlled model preflight requires actual OpenAI-compatible tool_call objects from both candidate "
+                "models before native task execution begins."
+            ),
+            (
+                "Monetary model API cost is $0 for local Ollama inference; GitHub-hosted runner cost is not invented "
+                "or inferred from unavailable billing metadata."
+            ),
+            "This is a representative native slice, not the entire published AgencyBench suite.",
         ],
     }
     Path(args.output_json).write_text(json.dumps(result, indent=2), encoding="utf-8")
@@ -200,15 +234,14 @@ def report(args: argparse.Namespace) -> dict[str, Any]:
         "",
         "| Component | Result |",
         "|---|---:|",
-        f"| Backend primary native subtasks | {primary.get('subtasks', 0)} |",
+        f"| Backend native contracts scored | {primary.get('subtasks', 0)} |",
         f"| Backend primary mean best score | {primary.get('mean_best_score', 0.0):.2f}/10 |",
         f"| Backend primary successful native commands | {primary.get('successful_native_commands', 0)} |",
-        f"| Backend native retry subtasks | {primary.get('retry_subtasks', 0)} |",
-        f"| Backend native feedback events | {primary.get('feedback_events', 0)} |",
+        f"| Backend native rubric attempts | {primary.get('native_judge_attempts', 0)} |",
         f"| Recovery alternate agent executed | {'yes' if recovery_triggered else 'no'} |",
         f"| Frontend Docker/native judge subtasks | {frontend.get('subtasks', 0)} |",
         f"| Frontend mean best score | {frontend.get('mean_best_score', 0.0):.2f}/10 |",
-        f"| Live model/evaluator requests | {meter.get('model_requests', 0)} |",
+        f"| Metered proxy requests | {meter.get('model_requests', 0)} |",
         f"| Reported prompt tokens | {meter.get('prompt_tokens_reported', 0)} |",
         f"| Reported completion tokens | {meter.get('completion_tokens_reported', 0)} |",
         f"| Reported total tokens | {meter.get('total_tokens_reported', 0)} |",
