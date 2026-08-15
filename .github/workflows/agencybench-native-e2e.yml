@@ -43,7 +43,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install AgentWeave, AgencyBench and SII bridge runtime
+      - name: Install AgentWeave, AgencyBench and SII CLI runtime
         run: |
           python -m pip install --upgrade pip
           pip install -e .
@@ -58,18 +58,14 @@ jobs:
           assert 'enable_data_upload' in signature(SiiAgentOptions).parameters
           print('SII SDK compatibility verified')
           PY
-          # The Python SDK launches a Node bridge for shell/file tool execution.
-          # GAIR's rollout documentation installs this package globally and exports
-          # SII_BRIDGE_PATH to its executable.
+          # Official SII Agent SDK documentation requires the globally installed
+          # @gair/sii-cli package to provide the Node.js bridge.
           node --version
           npm --version
-          npm install --global sii-agent-bridge
-          BRIDGE_PATH="$(command -v sii-agent-bridge)"
-          test -n "$BRIDGE_PATH"
-          test -x "$BRIDGE_PATH"
-          echo "SII_BRIDGE_PATH=$BRIDGE_PATH" >> "$GITHUB_ENV"
-          "$BRIDGE_PATH" --help >/dev/null 2>&1 || "$BRIDGE_PATH" --version >/dev/null 2>&1 || true
-          echo "SII bridge installed at $BRIDGE_PATH"
+          npm install --global @gair/sii-cli
+          command -v sii
+          sii --version
+          npm root --global
 
       - name: Install Ollama and pull open models
         shell: bash
@@ -99,15 +95,9 @@ jobs:
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8911/chat/completions \
             -H 'Content-Type: application/json' \
-            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":80}" \
+            -d "{\"model\":\"${FALLBACK_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":80}" \
             | tee native-e2e-meter/model-smoke.json
           grep -q 'AGENCYBENCH_MODEL_READY' native-e2e-meter/model-smoke.json
-
-      - name: Verify SII bridge runtime
-        run: |
-          test -n "$SII_BRIDGE_PATH"
-          test -x "$SII_BRIDGE_PATH"
-          echo "Using SII bridge: $SII_BRIDGE_PATH"
 
       - name: Route full Backend scenario with AgentWeave
         run: |
@@ -127,7 +117,6 @@ jobs:
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
           BRIDGE_TIMEOUT_MS=600000
-          SII_BRIDGE_PATH=${SII_BRIDGE_PATH}
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
@@ -164,7 +153,6 @@ jobs:
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
           BRIDGE_TIMEOUT_MS=600000
-          SII_BRIDGE_PATH=${SII_BRIDGE_PATH}
           SII_AGENT_API_KEY=ollama-local
           SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
@@ -211,7 +199,6 @@ jobs:
           SANDBOX_BASE_URL=http://127.0.0.1:8080
           MAX_SUBTASK_ATTEMPTS=2
           BRIDGE_TIMEOUT_MS=600000
-          SII_BRIDGE_PATH=${SII_BRIDGE_PATH}
           SANDBOX_TIMEOUT_SEC=90
           SII_USERNAME=agentweave-local
           SII_PASSWORD=agentweave-local
