@@ -1,0 +1,66 @@
+name: AgentProcessBench External Process Quality
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agentweave/**'
+      - 'scripts/agentprocessbench_external_eval.py'
+      - '.github/workflows/agentprocessbench-external.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agentprocessbench:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout AgentWeave
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned AgentProcessBench data
+        uses: actions/checkout@v5
+        with:
+          repository: RUCBM/AgentProcessBench
+          ref: 0a42606b178a8c69d40c5765dc05c342f921e578
+          path: external/AgentProcessBench
+          sparse-checkout: |
+            data/AgentProcessBench
+          sparse-checkout-cone-mode: false
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Evaluate label-blind process-quality baseline
+        run: |
+          python scripts/agentprocessbench_external_eval.py \
+            --data-root external/AgentProcessBench/data/AgentProcessBench \
+            --output-prefix agentprocessbench-results
+          cat agentprocessbench-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate benchmark coverage
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('agentprocessbench-results.json'))
+          assert r['records'] == 1000, r
+          assert len(r['datasets']) == 4, r
+          assert r['steps'] > 8000, r
+          assert 0.0 <= r['step_micro_acc'] <= 1.0, r
+          assert 0.0 <= r['first_error_acc'] <= 1.0, r
+          print('AgentProcessBench coverage and evidence validated.')
+          PY
+
+      - name: Upload AgentProcessBench evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentprocessbench-external-process-quality
+          path: |
+            agentprocessbench-results.json
+            agentprocessbench-results.md
+          if-no-files-found: error
