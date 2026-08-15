@@ -1,0 +1,47 @@
+name: ToolBench External Tool Routing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'agentweave/**'
+      - 'scripts/toolbench_external_eval.py'
+      - '.github/workflows/toolbench-external.yml'
+      - 'pyproject.toml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  toolbench-routing:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout AgentWeave
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install evaluation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install 'datasets>=3.6,<5'
+
+      - name: Evaluate ToolBench external open-catalog routing
+        run: |
+          python scripts/toolbench_external_eval.py
+          cat toolbench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload ToolBench evaluation evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolbench-external-routing-evaluation
+          path: |
+            toolbench-routing-results.json
+            toolbench-routing-results.md
+          if-no-files-found: error
