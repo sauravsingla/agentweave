@@ -23,7 +23,7 @@ jobs:
     env:
       AGENTWEAVE_EXTERNAL_A2A_TARGETS: ${{ secrets.AGENTWEAVE_EXTERNAL_A2A_TARGETS }}
       AGENTWEAVE_PUBLIC_A2A_TARGETS: >-
-        [{"name":"Bole","agent_card_url":"https://nexus-api-6gxx.onrender.com/.well-known/agent-card.json","implementation":"independently-hosted"},{"name":"Deep Research Archives","agent_card_url":"https://deepresearcharchives.com/.well-known/agent-card.json","implementation":"independently-hosted"},{"name":"Delx","agent_card_url":"https://ontology.delx.ai/.well-known/agent-card.json","implementation":"independently-hosted"}]
+        [{"name":"Deep Research Archives","agent_card_url":"https://deepresearcharchives.com/.well-known/agent-card.json","implementation":"independently-hosted"},{"name":"Delx","agent_card_url":"https://ontology.delx.ai/.well-known/agent-card.json","implementation":"independently-hosted"}]
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
