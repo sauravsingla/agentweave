@@ -11,13 +11,14 @@ from agentbench_external_eval import AGENTBENCH_PIN, DOMAIN_SPECS, build_agent_c
 from agentweave.engine import AgentMatcher, PlacementEngine, TrustEngine
 from agentweave.requirements import RequirementAnalyzer
 
+COMMIT_CONFIDENCE = 0.65
+
 
 def evaluate_selective(tasks: list[dict]) -> dict:
-    """Blind, confidence-aware routing on raw task text only.
+    """Blind confidence-aware routing on raw task text only.
 
-    The router commits to a specialist only when AgentWeave infers explicit specialist
-    domain evidence from the task text. Otherwise it abstains instead of forcing a
-    low-confidence generalist choice. AgentBench labels remain hidden until scoring.
+    Labels are retained only as post-routing ground truth. AgentWeave commits when a
+    specialist domain is inferred with sufficient confidence; otherwise it abstains.
     """
     agents = build_agent_catalog()
     matcher = AgentMatcher(TrustEngine(), PlacementEngine(), use_native=False)
@@ -27,7 +28,7 @@ def evaluate_selective(tasks: list[dict]) -> dict:
     for task in tasks:
         req = analyzer.analyze(task["text"])
         started = time.perf_counter_ns()
-        committed = bool(req.domains)
+        committed = bool(req.domains) and req.inference_confidence >= COMMIT_CONFIDENCE
         selected = matcher.rank(req, agents)[0].agent if committed else None
         elapsed_us = (time.perf_counter_ns() - started) / 1000.0
         rows.append({
@@ -40,6 +41,9 @@ def evaluate_selective(tasks: list[dict]) -> dict:
             "inferred_capabilities": sorted(req.capabilities),
             "inferred_domains": sorted(req.domains),
             "inferred_knowledge": sorted(req.knowledge),
+            "inference_confidence": req.inference_confidence,
+            "inference_source": req.inference_source,
+            "ambiguity": req.ambiguity,
         })
 
     committed_rows = [r for r in rows if r["committed"]]
@@ -71,6 +75,7 @@ def evaluate_selective(tasks: list[dict]) -> dict:
         "agentbench_repository": "THUDM/AgentBench",
         "agentbench_commit": AGENTBENCH_PIN,
         "total_tasks": len(rows),
+        "commit_confidence_threshold": COMMIT_CONFIDENCE,
         "committed_tasks": len(committed_rows),
         "abstained_tasks": len(rows) - len(committed_rows),
         "coverage": coverage,
@@ -82,7 +87,7 @@ def evaluate_selective(tasks: list[dict]) -> dict:
         "protocol_boundary": {
             "router_input": "Raw published AgentBench task text only.",
             "withheld": "AgentBench environment/domain label and expected specialist identity during routing.",
-            "confidence_rule": "Commit only when generic RequirementAnalyzer infers one or more specialist domains; otherwise abstain.",
+            "confidence_rule": f"Commit only when generic RequirementAnalyzer infers a specialist domain with confidence >= {COMMIT_CONFIDENCE:.2f}; otherwise abstain.",
             "ground_truth": "AgentBench domain label is used only after routing to score the committed specialist.",
             "external_data": "Published AgentBench task text and held-out domain labels.",
             "synthetic_data": "Candidate agent catalog, trust, proficiency, latency and cost values.",
@@ -99,7 +104,7 @@ def markdown_report(result: dict) -> str:
         f"Pinned AgentBench commit: `{result['agentbench_commit']}`",
         f"Tasks: **{result['total_tasks']}**",
         "",
-        "**Protocol:** raw task text only. AgentBench labels are hidden during routing. AgentWeave commits only when it has explicit specialist-domain evidence; otherwise it abstains.",
+        f"**Protocol:** raw task text only; labels are hidden during routing. AgentWeave commits only with a specialist domain and confidence >= **{result['commit_confidence_threshold']:.2f}**.",
         "",
         f"- Coverage: **{100*result['coverage']:.1f}%** ({result['committed_tasks']} committed / {result['total_tasks']} total)",
         f"- Selective accuracy on committed tasks: **{100*result['selective_accuracy']:.1f}%**",
@@ -113,17 +118,15 @@ def markdown_report(result: dict) -> str:
         "|---|---:|---:|---:|---:|",
     ]
     for domain, row in result["per_domain"].items():
-        lines.append(
-            f"| {domain} | {row['tasks']} | {row['committed']} | {100*row['coverage']:.1f}% | {100*row['selective_accuracy']:.1f}% |"
-        )
+        lines.append(f"| {domain} | {row['tasks']} | {row['committed']} | {100*row['coverage']:.1f}% | {100*row['selective_accuracy']:.1f}% |")
     lines += [
         "",
         "## Interpretation boundary",
         "",
-        "- This measures whether AgentWeave can recognize when it has enough text evidence to commit to a specialist.",
+        "- This measures whether AgentWeave can infer enough task intent to commit to a specialist.",
         "- Abstention is intentional and is not counted as a correct route.",
         "- The benchmark label is never used to decide whether to commit or which agent to choose.",
-        "- The next layer for abstained tasks should be semantic/LLM requirement inference or broader discovery, not benchmark-specific keyword leakage.",
+        "- Built-in lexical and semantic-intent inference is benchmark-label independent; an optional external semantic/LLM inferencer can be plugged in separately.",
         "- This is still a routing evaluation, not original AgentBench end-to-end environment success.",
         "",
     ]

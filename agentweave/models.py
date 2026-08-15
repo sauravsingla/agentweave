@@ -61,6 +61,9 @@ class Requirement:
     local_only: bool = False
     max_latency_ms: float | None = None
     privacy_level: str | None = None
+    inference_confidence: float = 0.0
+    inference_source: str | None = None
+    ambiguity: list[str] = field(default_factory=list)
 
 @dataclass
 class MatchResult:
