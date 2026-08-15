@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentweave"
-version = "0.2.1"
+version = "0.3.0"
 description = "Knowledge-, capability-, and trust-aware framework for discovering, validating, selecting, and orchestrating heterogeneous AI agents across cloud, marketplace, enterprise, and edge environments."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 security = ["PyJWT[crypto]>=2.9", "cryptography>=42"]
 api = ["fastapi>=0.115", "uvicorn>=0.30"]
+native = ["pybind11>=2.13"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [tool.setuptools.packages.find]

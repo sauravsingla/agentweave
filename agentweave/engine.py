@@ -1,5 +1,6 @@
 from __future__ import annotations
 from .models import AgentProfile, MatchResult
+from .native import NativeAcceleration
 
 class AgentRegistry:
     def __init__(self,store=None,graph=None): self._agents={}; self.store=store; self.graph=graph
@@ -30,13 +31,17 @@ class PlacementEngine:
         if not a.execution.available: return 0.0
         if req.local_only and a.execution.location!='edge': return 0.0
         if req.max_latency_ms is not None and a.execution.latency_ms>req.max_latency_ms: return 0.0
+        if getattr(req,'privacy_level',None)=='local-only' and a.execution.location!='edge': return 0.0
         locality=1.0 if a.execution.location=='edge' else .75
         privacy=1.0 if a.execution.privacy_level in {'local-only','confidential'} else .65
         latency=1/(1+a.execution.latency_ms/1000)
-        return .35*locality+.35*privacy+.30*latency
+        cost=1/(1+max(0.0,float(getattr(a.execution,'cost',0.0))))
+        return .31*locality+.31*privacy+.25*latency+.13*cost
 
 class AgentMatcher:
-    def __init__(self,trust,placement): self.trust=trust; self.placement=placement
+    def __init__(self,trust,placement,use_native=True): self.trust=trust; self.placement=placement; self.native=NativeAcceleration() if use_native else None
+    @property
+    def native_available(self): return bool(self.native and self.native.available)
     def match(self,req,a):
         cmap={c.name.lower():c for c in a.capabilities}; matched=req.capabilities & set(cmap); missing=req.capabilities-set(cmap)
         p=self.placement.score(req,a)
@@ -47,7 +52,12 @@ class AgentMatcher:
         knowledge=1.0 if not req.knowledge or req.knowledge & set(map(str.lower,a.knowledge)) else .35
         score=.30*coverage+.17*prof+.10*valid+.16*self.trust.score(a)+.09*domain+.08*knowledge+.10*p
         return MatchResult(a,score,matched,missing,p)
-    def rank(self,req,agents): return sorted((self.match(req,a) for a in agents),key=lambda x:x.score,reverse=True)
+    def rank(self,req,agents):
+        agents=list(agents)
+        if self.native_available:
+            out=self.native.rank(req,agents,self.trust,self.placement)
+            if out is not None: return out
+        return sorted((self.match(req,a) for a in agents),key=lambda x:x.score,reverse=True)
 
 class TeamSelector:
     def select(self,req,ranked,max_agents=5):
