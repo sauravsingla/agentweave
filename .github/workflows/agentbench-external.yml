@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - 'agentweave/requirements.py'
       - 'scripts/agentbench_external_eval.py'
       - 'scripts/agentbench_blind_eval.py'
       - '.github/workflows/agentbench-external.yml'
