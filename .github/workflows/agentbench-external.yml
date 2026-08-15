@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/agentbench_external_eval.py'
+      - 'scripts/agentbench_blind_eval.py'
       - '.github/workflows/agentbench-external.yml'
   workflow_dispatch:
 
@@ -39,12 +40,19 @@ jobs:
       - name: Install AgentWeave
         run: pip install -e .
 
-      - name: Evaluate AgentWeave routing on external AgentBench tasks
+      - name: Evaluate label-informed AgentWeave routing
         run: |
           python scripts/agentbench_external_eval.py \
             --agentbench-root external/AgentBench \
             --per-domain 200
           cat agentbench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Evaluate blind text-only AgentWeave routing
+        run: |
+          python scripts/agentbench_blind_eval.py \
+            --agentbench-root external/AgentBench \
+            --per-domain 200
+          cat agentbench-blind-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload AgentBench evaluation evidence
         uses: actions/upload-artifact@v4
@@ -53,3 +61,5 @@ jobs:
           path: |
             agentbench-routing-results.json
             agentbench-routing-results.md
+            agentbench-blind-results.json
+            agentbench-blind-results.md
