@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  models: read
 
 jobs:
   native-e2e:
@@ -18,10 +17,9 @@ jobs:
     timeout-minutes: 120
     env:
       AGENCYBENCH_PIN: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
-      PRIMARY_MODEL: openai/gpt-4.1
-      FALLBACK_MODEL: openai/gpt-4o
-      VISION_MODEL: openai/gpt-4o
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      PRIMARY_MODEL: qwen2.5-coder:3b
+      FALLBACK_MODEL: qwen3:4b
+      VISION_MODEL: qwen3-vl:2b
     steps:
       - name: Checkout AgentWeave
         uses: actions/checkout@v5
@@ -51,20 +49,35 @@ jobs:
           pip install -e .
           pip install -r external/AgencyBench/requirements.txt
 
-      - name: Start metered GitHub Models gateways
+      - name: Install Ollama and pull open models
+        shell: bash
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve > ollama.log 2>&1 & echo $! > ollama.pid
+          for i in $(seq 1 45); do
+            curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break
+            sleep 2
+          done
+          ollama pull "$PRIMARY_MODEL"
+          ollama pull "$FALLBACK_MODEL"
+          ollama pull "$VISION_MODEL"
+          ollama list | tee ollama-models.txt
+
+      - name: Start metered local model gateways
         run: |
           mkdir -p native-e2e-meter
-          nohup python scripts/github_models_meter_proxy.py --port 8911 --label agent --log native-e2e-meter/agent.jsonl > native-e2e-meter/agent-proxy.log 2>&1 & echo $! > native-e2e-meter/agent.pid
-          nohup python scripts/github_models_meter_proxy.py --port 8912 --label text-evaluator --log native-e2e-meter/text-evaluator.jsonl > native-e2e-meter/text-proxy.log 2>&1 & echo $! > native-e2e-meter/text.pid
-          nohup python scripts/github_models_meter_proxy.py --port 8913 --label vision-evaluator --log native-e2e-meter/vision-evaluator.jsonl > native-e2e-meter/vision-proxy.log 2>&1 & echo $! > native-e2e-meter/vision.pid
-          sleep 3
+          MODELS="${PRIMARY_MODEL},${FALLBACK_MODEL},${VISION_MODEL}"
+          nohup python scripts/github_models_meter_proxy.py --port 8911 --label agent --log native-e2e-meter/agent.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/agent-proxy.log 2>&1 & echo $! > native-e2e-meter/agent.pid
+          nohup python scripts/github_models_meter_proxy.py --port 8912 --label text-evaluator --log native-e2e-meter/text-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/text-proxy.log 2>&1 & echo $! > native-e2e-meter/text.pid
+          nohup python scripts/github_models_meter_proxy.py --port 8913 --label vision-evaluator --log native-e2e-meter/vision-evaluator.jsonl --upstream http://127.0.0.1:11434/v1 --models "$MODELS" > native-e2e-meter/vision-proxy.log 2>&1 & echo $! > native-e2e-meter/vision.pid
+          sleep 2
           curl --fail --silent --show-error http://127.0.0.1:8911/models >/dev/null
 
-      - name: Prove live GitHub Models inference
+      - name: Prove live local model inference and token usage
         run: |
           curl --fail --silent --show-error http://127.0.0.1:8911/chat/completions \
             -H 'Content-Type: application/json' \
-            -d '{"model":"openai/gpt-4.1","messages":[{"role":"user","content":"Return exactly: AGENCYBENCH_MODEL_READY"}],"temperature":0,"max_tokens":20}' \
+            -d "{\"model\":\"${PRIMARY_MODEL}\",\"messages\":[{\"role\":\"user\",\"content\":\"Return exactly: AGENCYBENCH_MODEL_READY\"}],\"temperature\":0,\"max_tokens\":30}" \
             | tee native-e2e-meter/model-smoke.json
           grep -q 'AGENCYBENCH_MODEL_READY' native-e2e-meter/model-smoke.json
 
@@ -76,7 +89,6 @@ jobs:
             --output agencybench-native-route.json
 
       - name: Run full native Backend scenario1 with primary AgentWeave-selected agent
-        id: backend_primary
         shell: bash
         run: |
           set +e
@@ -89,21 +101,21 @@ jobs:
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=300000
-          SII_AGENT_API_KEY=${GITHUB_TOKEN}
-          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911
+          BRIDGE_TIMEOUT_MS=420000
+          SII_AGENT_API_KEY=ollama-local
+          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously inside the assigned AgencyBench workspace. Use tools, compile and test repeatedly, preserve prior subtask work, and respond to evaluator feedback until the deliverables satisfy the task.
-          SII_MAX_TURNS=120
+          SII_SYSTEM_PROMPT=You are the ${FAMILY} specialist selected by AgentWeave. Work autonomously inside the assigned AgencyBench workspace. Use the available shell and file tools, compile and test repeatedly, preserve prior subtask work, and respond to evaluator feedback until the deliverables satisfy the task. Prefer direct implementation over long explanations.
+          SII_MAX_TURNS=80
           EOF
           START=$(date +%s)
-          timeout 3300s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.json" 2>&1 | tee backend-primary.log
+          timeout 3000s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.json" 2>&1 | tee backend-primary.log
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
           echo "$RC" > backend-primary.rc
           echo "$((END-START))" > backend-primary.seconds
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'gpt-4.1' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen2.5-coder_3b' | head -1)
           if [ -n "$META" ]; then cp "$META" backend-primary-meta.json; fi
           exit 0
 
@@ -137,21 +149,21 @@ jobs:
           cat > "$DIR/.env.agentweave-fallback" <<EOF
           CONDA_ENV_NAME=
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=300000
-          SII_AGENT_API_KEY=${GITHUB_TOKEN}
-          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911
+          BRIDGE_TIMEOUT_MS=420000
+          SII_AGENT_API_KEY=ollama-local
+          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${FALLBACK_MODEL}
-          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected by AgentWeave after the primary agent failed to reach the native AgencyBench acceptance threshold. Work autonomously, compile and test every deliverable, and use native evaluator feedback to repair failures.
-          SII_MAX_TURNS=120
+          SII_SYSTEM_PROMPT=You are the backup ${FAMILY} specialist selected by AgentWeave after the primary agent failed to reach the native AgencyBench acceptance threshold. Work autonomously with shell and file tools, compile and test every deliverable, and use native evaluator feedback to repair failures. Prefer direct implementation over long explanations.
+          SII_MAX_TURNS=80
           EOF
           START=$(date +%s)
-          timeout 2100s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave-fallback" --description "$DIR/description.json" 2>&1 | tee backend-fallback.log
+          timeout 1800s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave-fallback" --description "$DIR/description.json" 2>&1 | tee backend-fallback.log
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
           echo "$RC" > backend-fallback.rc
           echo "$((END-START))" > backend-fallback.seconds
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'gpt-4o' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen3_4b' | head -1)
           if [ -n "$META" ]; then cp "$META" backend-fallback-meta.json; fi
           exit 0
 
@@ -179,36 +191,35 @@ jobs:
           from pathlib import Path
           p=Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.json')
           d=json.load(p.open())
-          out={'subtask_count':1,'subtask1':d['subtask1']}
-          Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.agentweave.json').write_text(json.dumps(out,indent=2))
+          Path('external/AgencyBench/AgencyBench-v2/Frontend/scenario1/description.agentweave.json').write_text(json.dumps({'subtask_count':1,'subtask1':d['subtask1']},indent=2))
           PY
           cat > "$DIR/.env.agentweave" <<EOF
           CONDA_ENV_NAME=
           SANDBOX_BASE_URL=http://127.0.0.1:8080
           MAX_SUBTASK_ATTEMPTS=2
-          BRIDGE_TIMEOUT_MS=300000
-          SANDBOX_TIMEOUT_SEC=60
-          SII_AGENT_API_KEY=${GITHUB_TOKEN}
-          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911
+          BRIDGE_TIMEOUT_MS=420000
+          SANDBOX_TIMEOUT_SEC=90
+          SII_AGENT_API_KEY=ollama-local
+          SII_AGENT_API_BASE_URL=http://127.0.0.1:8911/v1
           SII_AUTH_TYPE=USE_OPENAI
           SII_TARGET_MODEL=${PRIMARY_MODEL}
-          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable in the assigned workspace, use browser-oriented evidence where appropriate, and repair the result from evaluator feedback.
-          SII_MAX_TURNS=100
-          EVAL_TEXT_API_KEY=${GITHUB_TOKEN}
-          EVAL_TEXT_API_BASE_URL=http://127.0.0.1:8912
-          EVAL_TEXT_MODEL=${PRIMARY_MODEL}
+          SII_SYSTEM_PROMPT=You are the Frontend specialist selected by AgentWeave. Build the requested deliverable with shell and file tools, use browser-oriented evidence where appropriate, and repair the result from evaluator feedback. Prefer direct implementation over long explanations.
+          SII_MAX_TURNS=60
+          EVAL_TEXT_API_KEY=ollama-local
+          EVAL_TEXT_API_BASE_URL=http://127.0.0.1:8912/v1
+          EVAL_TEXT_MODEL=${FALLBACK_MODEL}
           EVAL_VISION_PROVIDER=qwen
           VISION_MODEL=${VISION_MODEL}
-          QWEN_VISION_BASE_URL=http://127.0.0.1:8913
-          QWEN_VISION_API_KEY=${GITHUB_TOKEN}
+          QWEN_VISION_BASE_URL=http://127.0.0.1:8913/v1
+          QWEN_VISION_API_KEY=ollama-local
           EOF
           START=$(date +%s)
-          timeout 1800s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.agentweave.json" 2>&1 | tee frontend-native.log
+          timeout 1500s python "$DIR/eval_task.py" --env "$DIR/.env.agentweave" --description "$DIR/description.agentweave.json" 2>&1 | tee frontend-native.log
           RC=${PIPESTATUS[0]}
           END=$(date +%s)
           echo "$RC" > frontend-native.rc
           echo "$((END-START))" > frontend-native.seconds
-          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'gpt-4.1' | head -1)
+          META=$(find "$DIR" -mindepth 2 -maxdepth 2 -name meta_eval.json ! -path '*/claude/*' -print | grep -F 'qwen2.5-coder_3b' | head -1)
           if [ -n "$META" ]; then cp "$META" frontend-native-meta.json; fi
           exit 0
 
@@ -243,9 +254,10 @@ jobs:
           import json
           r=json.load(open('agencybench-native-e2e-results.json'))
           assert r['metering']['model_requests'] > 1, r
+          assert r['metering']['total_tokens_reported'] > 0, r
           assert r['backend_primary']['subtasks'] >= 1, r
           assert r['frontend_docker_native_judge']['subtasks'] >= 1, r
-          print('Native AgencyBench execution, metering, Docker evidence and native judge artifacts are present.')
+          print('Native AgencyBench execution, local model calls, token metering, Docker evidence and native judge artifacts are present.')
           PY
 
       - name: Upload native AgencyBench evidence
@@ -273,6 +285,8 @@ jobs:
             frontend-native.seconds
             docker-sandbox-ready.txt
             docker-sandbox-inspect.json
+            ollama.log
+            ollama-models.txt
             native-e2e-meter/*.json
             native-e2e-meter/*.jsonl
             native-e2e-meter/*.log
