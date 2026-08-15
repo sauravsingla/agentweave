@@ -9,6 +9,7 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 [![A2A SDK Interop](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml)
 [![Protocol Depth](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml)
 [![External Proof](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml)
+[![AgentBench](https://github.com/sauravsingla/agentweave/actions/workflows/agentbench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/agentbench-external.yml)
 
 > **A2A answers:** how can agents communicate?
 >
@@ -105,7 +106,7 @@ Cloud / Marketplace / Enterprise / Edge Agents
 
 ## Verified test results
 
-The results below are from GitHub Actions on commit `cadf2d4c517bfae07536e6c37332beac7f06ef6d` on **2026-08-15**. They distinguish real external tests from synthetic benchmark data.
+The core proof results below were established on commit `cadf2d4c517bfae07536e6c37332beac7f06ef6d` on **2026-08-15**. The external AgentBench evaluation was added later and is reported separately with its own commit and data boundary.
 
 ### Workflow status
 
@@ -116,6 +117,7 @@ The results below are from GitHub Actions on commit `cadf2d4c517bfae07536e6c3733
 | Protocol Depth Proof | ✅ PASS | lifecycle/gRPC dispatch/push contract tests |
 | A2A SDK Interoperability Proof | ✅ PASS | Python, Go, JavaScript, Java A2A agents |
 | External Environment Proof | ✅ PASS | independently hosted public A2A services |
+| AgentBench External Data Evaluation | ✅ PASS | external published task text, blind routing, selective routing, evidence artifacts |
 
 ### Cross-SDK A2A interoperability
 
@@ -201,6 +203,58 @@ Generated research artifacts:
 - `research/METHODOLOGY.md`
 - `research/benchmark_cases.json`
 
+### External AgentBench routing evaluation
+
+AgentWeave is also evaluated against **external published benchmark data** from the official `THUDM/AgentBench` repository, pinned to commit `d1e4a10db08c87075c78972e48ecc182be03e2d5`. The latest evaluation workflow ran on AgentWeave commit `5db8b075332a75d73905c125e0c614e74d61b513`.
+
+The evaluation uses **490 published AgentBench tasks**:
+
+| AgentBench environment | Tasks |
+|---|---:|
+| DBBench | 200 |
+| KnowledgeGraph | 150 |
+| OS Interaction | 140 |
+| **Total** | **490** |
+
+Three related tests are reported because they answer different questions:
+
+| Evaluation | What the router sees | Result | Correct interpretation |
+|---|---|---:|---|
+| **Label-informed matching** | Task text plus requirement/domain derived from the published environment label | **100.0% specialist selection** | Tests matching/ranking once the required expertise is already known; **not a blind result** |
+| **Blind text-only routing** | Raw task text only; AgentBench environment label withheld until scoring | **34.1% specialist selection over all 490 tasks** | Tests AgentWeave's current requirement inference plus routing without label leakage |
+| **Confidence-aware selective routing** | Raw task text only; router may abstain when specialist evidence is insufficient | **96.0% accuracy on committed routes at 35.5% coverage** | Measures precision when AgentWeave has enough evidence to commit; abstentions are not counted as correct routes |
+
+For the confidence-aware blind run, AgentWeave committed on **174 / 490 tasks**, correctly selected the specialist on **167 tasks**, and abstained on **316 tasks**. This is **34.1% correct specialist selection across the full dataset**, not 96% across all tasks.
+
+Per-domain selective-routing results:
+
+| Domain | Tasks | Committed | Coverage | Accuracy when committed |
+|---|---:|---:|---:|---:|
+| Database | 200 | 63 | 31.5% | **100.0%** |
+| Knowledge graph | 150 | 0 | 0.0% | N/A — no committed route |
+| Operating system | 140 | 111 | 79.3% | **93.7%** |
+
+The blind text-only comparison against simple baselines was:
+
+| Method | Blind specialist-selection rate |
+|---|---:|
+| **AgentWeave** | **34.1%** |
+| Random | 19.2% |
+| Capability-only | 0.2% |
+| Single-best | 0.0% |
+| Trust-only | 0.0% |
+
+**Dataset and metric boundary:**
+
+- **External published data:** AgentBench task text and held-out environment/domain labels from DBBench, KnowledgeGraph, and OS Interaction.
+- **Synthetic data:** the candidate-agent catalog used for this routing experiment, including specialist/generalist identities, proficiency, validation flags, trust values, latency, and cost.
+- **Real measurement:** routing computation time is measured during the GitHub Actions run.
+- **Held-out label use:** in the blind and selective tests, the AgentBench environment label is used only after routing as ground truth for scoring.
+- **Not claimed:** these numbers are **not** the original AgentBench end-to-end environment success rate, LLM answer quality, production-user accuracy, real provider latency, or billed model cost.
+- **Known limitation:** KnowledgeGraph had 0% selective coverage because the current deterministic text analyzer often lacks enough observable evidence to infer the hidden backend/domain from the raw question alone. This motivates a future semantic/LLM requirement-inference layer rather than benchmark-specific label leakage.
+
+Evidence is produced by `.github/workflows/agentbench-external.yml` and uploaded as JSON/Markdown artifacts for the label-informed, blind, and selective evaluations.
+
 ### Security, storage, identity, governance, and reliability
 
 The latest Deep Proof run also completed successfully for:
@@ -216,17 +270,18 @@ A passing proof means the configured control behaved as expected in that test ru
 
 ## What data is used?
 
-AgentWeave distinguishes three different things that are easy to confuse: **real systems / real execution**, **real-world datasets**, and **synthetic benchmark data**.
+AgentWeave distinguishes four different things that are easy to confuse: **real systems / real execution**, **external public benchmark data**, **synthetic benchmark data**, and **production/real-world task traces**.
 
 | Category | Current status | What AgentWeave uses today |
 |---|---|---|
 | **Real systems / real execution** | ✅ Used and tested | Independently hosted public A2A services, live upstream SDK agents, official A2A TCK, a real PostgreSQL service, and real Docker/runtime isolation behavior |
-| **Real-world task dataset** | ❌ Not yet included | No public corpus of real user tasks, real agent histories, or production task outcomes is currently used for the research-quality benchmark |
-| **Synthetic benchmark data** | ✅ Used | Generated agent populations, capabilities, trust values, latency/cost distributions, routing scenarios, and adversarial fixtures |
+| **External public benchmark data** | ✅ Used | 490 published AgentBench task records from DBBench, KnowledgeGraph, and OS Interaction, pinned to a specific upstream commit |
+| **Synthetic benchmark data** | ✅ Used | Generated agent populations, capabilities, trust values, latency/cost distributions, routing scenarios, adversarial fixtures, and the candidate-agent catalog used in the AgentBench routing experiment |
+| **Production / real-world agent traces** | ❌ Not yet included | No private production-user task corpus, production agent histories, billed provider cost traces, or human-rated production outcomes are claimed |
 
 ### What “real” means in the current results
 
-“Real” currently means that AgentWeave interacted with **actual external systems or infrastructure**, not that the research benchmark is based on a real-world dataset.
+“Real” can refer to different evidence types, so AgentWeave reports them separately rather than treating all non-synthetic evidence as equivalent.
 
 The real execution evidence includes:
 
@@ -238,9 +293,19 @@ The real execution evidence includes:
 - **Docker/runtime security:** actual container/runtime isolation controls were executed rather than simulated.
 - **10K / 100K / 1M scale execution:** the benchmark physically processed those synthetic agent records; the execution is real even though the records themselves are synthetic.
 
+### What external benchmark data is used
+
+AgentWeave currently uses a pinned subset of the public **AgentBench** repository for an external routing evaluation:
+
+- DBBench task descriptions — 200 tasks;
+- KnowledgeGraph questions — 150 tasks;
+- OS Interaction task descriptions — 140 tasks.
+
+The task text is external published benchmark data. In blind tests, the associated environment/domain label is withheld from the router and used only afterward for scoring. This should be interpreted as an **external benchmark routing evaluation**, not as production-user data or the original end-to-end AgentBench success metric.
+
 ### What is synthetic today
 
-The current scalability and research evaluations use generated data. Synthetic fields include:
+The scalability and internal research evaluations still use generated data. Synthetic fields include:
 
 - agent capability assignments from the pool `analysis`, `research`, `coding`, `summarization`, `planning`, `vision`, `retrieval`, and `verification`;
 - capability-strength/evidence values;
@@ -248,6 +313,7 @@ The current scalability and research evaluations use generated data. Synthetic f
 - cloud/edge execution placement;
 - latency and cost values;
 - research routing scenarios and expected capability requirements;
+- the fixed candidate-agent catalog used to score AgentBench specialist selection;
 - malicious Agent Cards and prompt-injection fixtures;
 - Sybil/collusion clusters;
 - poisoned reputation histories;
@@ -256,11 +322,11 @@ The current scalability and research evaluations use generated data. Synthetic f
 
 The synthetic populations are generated reproducibly with fixed seeds where applicable so the benchmark can be repeated.
 
-### Real-world dataset status
+### Production / real-world task-data status
 
-AgentWeave does **not yet claim evaluation on a real-world task dataset**. In particular, the current research numbers should not be interpreted as accuracy on real users, production agent traces, human-rated task outcomes, or an external public benchmark corpus.
+AgentWeave **does not claim production-user or human-rated real-world task evaluation yet**. The AgentBench results are an important external-data step, but they should not be interpreted as accuracy on private production tasks, real agent histories, human-rated task outcomes, production provider latency, or billed cost.
 
-A future research milestone is to evaluate AgentWeave on public real-task corpora and/or independently collected agent-task traces with known outcomes, then report task success, quality, cost, latency, failure rate, and routing/team-selection improvement against the same baselines.
+A future research milestone is to add end-to-end task execution on published agent benchmarks and/or independently collected agent-task traces with known outcomes, then report task success, answer quality, cost, latency, failure rate, routing benefit, team-selection benefit, and calibration against appropriate baselines.
 
 ## Getting started
 
