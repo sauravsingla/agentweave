@@ -1,57 +1,243 @@
 # AgentWeave
 
-AgentWeave is a domain-agnostic framework for discovering, validating, selecting, and orchestrating heterogeneous AI agents across cloud, marketplaces, enterprise, and edge environments. A2A is the interoperability layer; AgentWeave adds requirement-aware discovery, evidence-backed capability validation, contextual trust, policy, team optimization, collaboration, semantic result verification, reputation, observability, resource-aware placement and production-proof tooling.
+**Knowledge-, capability-, trust-, and policy-aware orchestration for heterogeneous AI agents.**
+
+AgentWeave is an open-source framework for discovering, validating, selecting, and orchestrating AI agents across cloud, marketplaces, enterprise environments, and edge devices. It uses **A2A as the interoperability layer** and adds requirement intelligence, evidence-backed capability validation, contextual trust, knowledge graphs, global team optimization, governance, semantic verification, reputation learning, observability, sandboxing, and production proof tooling.
+
+[![CI](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml)
+[![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
+[![A2A SDK Interop](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml)
+[![Protocol Depth](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml)
+[![External Proof](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml)
+
+> **A2A answers:** how can agents communicate?
+>
+> **AgentWeave adds:** which agents should communicate for this requirement, can their expertise and identity be trusted, what should each do, where should they execute, and how should their outputs be validated and learned from?
+
+## Why AgentWeave?
+
+Modern agent ecosystems contain many heterogeneous agents with different skills, trust levels, costs, latencies, execution locations, security boundaries, and implementation stacks. Communication alone does not answer the routing and governance problem.
+
+AgentWeave is designed to:
+
+- **Discover agents** through A2A Agent Cards, registries, marketplaces, enterprise catalogs, and edge runtimes.
+- **Validate claims** using benchmarks, evidence, identity, policy, freshness, and historical outcomes.
+- **Match requirements to agents** using capability graphs, ontology relationships, semantic relevance, placement, cost, latency, and trust.
+- **Form teams** with global optimization across coverage, trust, diversity, redundancy, cost, latency, and communication overhead.
+- **Collaborate over A2A** with lifecycle, streaming, task management, cancellation, resume, subscription, and push-notification support.
+- **Verify results** using contradiction checks, citation/source-quality checks, uncertainty calibration, NLI/verifier hooks, and consensus/conflict handling.
+- **Learn from outcomes** through persistent reputation and dynamic re-testing.
+- **Operate safely** with governance, sandboxing, observability, identity, credentials, and audit controls.
 
 ## Architecture
 
 ```text
 Cloud / Marketplace / Enterprise / Edge Agents
-                    |
+                    │
+              Agent Discovery
+                    │
               Agent Registry
-                    |
-       Security + Identity + Benchmarks
-                    |
-       Capability + Knowledge Ontology
-                    |
-             Contextual Trust
-                    |
-          Matching + Placement
-                    |
-          Global Team Optimizer
-                    |
+                    │
+      Identity / Security / Benchmarks
+                    │
+     Capability + Knowledge Ontology
+                    │
+            Contextual Trust
+                    │
+        Matching + Placement
+                    │
+        Global Team Optimizer
+                    │
                    A2A
-                    |
+                    │
  Streaming / Long-running / Push Tasks
-                    |
-      Consensus + Conflict Resolution
-                    |
-      Result + Semantic Verification
-                    |
-       Reputation + Dynamic Retesting
+                    │
+   Consensus + Conflict Resolution
+                    │
+     Result + Semantic Verification
+                    │
+      Reputation + Dynamic Retesting
 ```
 
-## v0.6 maturity expansion
+## Key capabilities
 
-Version 0.6 closes the remaining **implementation** gaps identified after the initial deep-proof work:
+### A2A interoperability and lifecycle
 
-- A2A lifecycle over JSON-RPC/HTTP+JSON plus a generated-stub **gRPC lifecycle client** covering SendMessage, SendStreamingMessage, SubscribeToTask, GetTask, ListTasks, CancelTask and task push-notification configuration operations.
-- A2A **push-notification** configuration client and authenticated ASGI webhook receiver.
-- Official Linux Foundation A2A TCK MUST-level JSON-RPC proof against an AgentWeave SUT, plus cross-SDK Python/Go/JavaScript/Java live interoperability CI.
-- Expanded red-team coverage for malicious Agent Cards, prompt/data-exfiltration instructions, SSRF/link-local access, tool abuse, identity spoofing, Sybil/collusion, reputation-poisoning fixtures, Byzantine disagreement, timeouts and malformed results.
-- Active Docker sandbox proof for read-only filesystem, tmpfs, network isolation, secret isolation and cgroup CPU/memory/PID limits; Bubblewrap proof support is exercised where the runner permits user namespaces.
-- DID/VC, revocation, certificate-rotation, KMS/HSM boundary and workload-attestation proof code, with live DID/real hardware attestation remaining environment-dependent.
-- PostgreSQL concurrency, transactional outcome/audit writes, reconnect recovery, isolated write-through replica proof and durability counts.
-- Physical 10K/100K/1M matcher benchmark workflow with Python/native C++ comparison, memory, team-selection throughput and explicit graph-ingestion sample metrics.
-- Native C++ team-selection bridge in addition to native ranking.
-- Research baselines for random, single-best, trust-only, capability-greedy, embedding-only and native-greedy routing; no-trust/no-placement ablations, redundancy/diversity/quality-proxy metrics and bootstrap confidence intervals.
-- Ontology import, RDF/SKOS ingestion, aliases, inheritance, contradiction relationships, semantic retrieval and temporal freshness.
-- Result verification with citation/source-quality hooks, NLI contradiction hooks, verifier-agent support and calibration metrics (Brier score/ECE/classification metrics).
-- End-to-end span capture and OpenTelemetry-compatible tracing across requirement analysis, policy, matching, team selection, A2A collaboration, validation and reputation updates; selection explanations and audit history are returned with solve results.
-- Governance scenario proofs for jurisdiction, residency, tools, locality, risk tiers and human approval.
-- Chaos/reliability tests for disappearing agents, slow agents, network partitions, malformed responses, database failures and process-reopen recovery.
-- Versioned SDK facade, richer CLI, plugin example, deployment template, API compatibility policy, security policy, contribution guide, changelog and tag-driven release/PyPI workflow.
+- Agent Card discovery.
+- JSON-RPC and HTTP+JSON lifecycle support.
+- Generated-stub gRPC lifecycle client.
+- `SendMessage`, streaming, `GetTask`, `ListTasks`, `CancelTask`, task subscription, retry/resume, and push-notification configuration.
+- Authenticated ASGI push-notification receiver.
+- Official A2A TCK integration.
+- Cross-SDK interoperability proof using Python, Go, JavaScript, and Java implementations.
+- Independently hosted real-internet A2A proof.
 
-## Install
+### Trust, identity, security, and governance
+
+- Contextual trust vectors rather than one opaque trust score.
+- `did:web` plus pluggable DID resolution.
+- JWT Verifiable Credential verification and revocation.
+- Certificate/key rotation and KMS/HSM integration boundary.
+- Workload-attestation verification boundary.
+- Malicious Agent Card, prompt-injection, data-exfiltration, SSRF/link-local, tool-abuse, identity-spoofing, Sybil/collusion, reputation-poisoning, Byzantine, timeout, and malformed-result tests.
+- Docker sandboxing with read-only filesystem, tmpfs, network, secret, CPU, memory, and PID controls.
+- Bubblewrap support where the host permits user namespaces.
+- Governance for principal/scopes, jurisdiction, data residency, tools, locality, risk tiers, and human approval.
+
+### Knowledge, matching, and optimization
+
+- Capability and knowledge graphs.
+- RDF/SKOS ontology import.
+- Aliases, inheritance, semantic similarity, contradiction relationships, and temporal freshness.
+- Requirement-aware matching and placement.
+- Global team optimization across coverage, trust, diversity, latency, cost, redundancy, and communication overhead.
+- Python implementation plus C++/pybind native ranking/team-selection paths.
+
+### Verification, persistence, and observability
+
+- Citation and source-quality checks.
+- Contradiction/NLI hooks.
+- Verifier-agent hooks.
+- Brier score, ECE, and classification metrics for calibration evaluation.
+- SQLite for local use and PostgreSQL for production-oriented persistence.
+- Concurrent writes, transaction/audit proof, reconnect recovery, and replica-aware proof tooling.
+- Structured logs, metrics, OpenTelemetry-compatible spans, selection explanations, and audit history.
+
+## Verified test results
+
+The results below are from GitHub Actions on commit `cadf2d4c517bfae07536e6c37332beac7f06ef6d` on **2026-08-15**. They distinguish real external tests from synthetic benchmark data.
+
+### Workflow status
+
+| Proof | Result | What was exercised |
+|---|---:|---|
+| CI | ✅ PASS | Python tests, package install, C++ build/native smoke |
+| AgentWeave Deep Proof | ✅ PASS | A2A TCK, security, sandbox, identity, PostgreSQL, scale, research, verification, governance, chaos |
+| Protocol Depth Proof | ✅ PASS | lifecycle/gRPC dispatch/push contract tests |
+| A2A SDK Interoperability Proof | ✅ PASS | Python, Go, JavaScript, Java A2A agents |
+| External Environment Proof | ✅ PASS | independently hosted public A2A services |
+
+### Cross-SDK A2A interoperability
+
+AgentWeave launched independent upstream A2A SDK agents, waited for each Agent Card, discovered each agent, and completed a live invocation.
+
+| SDK implementation | Agent Card discovery | Invocation | Result |
+|---|---:|---:|---:|
+| Python | ✅ | ✅ | PASS |
+| Go | ✅ | ✅ | PASS |
+| JavaScript | ✅ | ✅ | PASS |
+| Java | ✅ | ✅ | PASS |
+
+### Real independently hosted A2A proof
+
+The external proof used public internet services not hosted by AgentWeave CI.
+
+| Service | Discovery | Real invocation | Notes |
+|---|---:|---:|---|
+| Deep Research Archives | ✅ | ✅ | Structured JSON-RPC `SendMessage` request |
+| Delx Agent Operations Protocol | ✅ | ✅ | Public registration bootstrap, credential capture, authenticated `message/send` |
+
+This is different from the controlled SDK test above: these services are independently hosted and were contacted over the public internet.
+
+### Official A2A conformance
+
+The Deep Proof workflow launches AgentWeave as an A2A system under test and executes the official A2A TCK with:
+
+```bash
+uv run ./run_tck.py --sut-host http://127.0.0.1:9998 --transport jsonrpc --level must
+```
+
+Result: **✅ PASS — JSON-RPC MUST-level TCK**.
+
+### 10K / 100K / 1M scalability benchmark
+
+Benchmark environment:
+
+- Python 3.11.15
+- Ubuntu 24.04 GitHub-hosted Azure runner
+- GCC 13.3.0
+- native extension available
+- synthetic agents generated reproducibly from a fixed-seed capability/trust/execution distribution
+- capability pool: `analysis`, `research`, `coding`, `summarization`, `planning`, `vision`, `retrieval`, `verification`
+
+The ranking benchmark physically evaluated the requested populations; it did **not** relabel a smaller run as a larger one.
+
+| Agents | Mode | Ranking time | Throughput | Peak RSS |
+|---:|---|---:|---:|---:|
+| 10,000 | Python | 0.0417 s | 239,526 agents/s | 82.0 MB |
+| 10,000 | Native C++ path | 0.2787 s | 35,881 agents/s | 100.2 MB |
+| 100,000 | Python | 1.1234 s | 89,018 agents/s | 255.0 MB |
+| 100,000 | Native C++ path | 3.0936 s | 32,324 agents/s | 255.0 MB |
+| 1,000,000 | Python | 11.9981 s | 83,346 agents/s | 299.1 MB |
+| 1,000,000 | Native C++ path | 34.1091 s | 29,318 agents/s | 299.1 MB |
+
+**Important:** in this current benchmark, the native ranking path is slower than the Python path. AgentWeave publishes that result rather than presenting the native implementation as an automatic speedup. The native team-selection microbenchmark reached approximately **4,859 ops/s at 10K**, **1,284 ops/s at 100K**, and **1,033 ops/s at 1M** in the same run.
+
+Graph-ingestion measurements used explicit bounded samples: 10K agents for the 10K run and 50K agents for the 100K/1M runs. The 50K sample produced **50,008 nodes / 124,845 edges**, with about **75.6K graph updates/s** in the 100K run and **67.2K updates/s** in the 1M run. This is intentionally reported as a sample, not as a million-node retained graph.
+
+### Research evaluation
+
+The current publication package uses a reproducible **synthetic benchmark dataset**, not a claim of real-world human task accuracy. Baselines include random, single-best, trust-only, capability-greedy, embedding-only, plus no-trust/no-placement ablations.
+
+Selected aggregate results from the latest green run:
+
+| Method | Coverage | Trust | Latency | Cost | Quality proxy |
+|---|---:|---:|---:|---:|---:|
+| AgentWeave | 0.7604 | 0.7524 | 77.8 ms | 0.2222 | 0.6201 |
+| Single-best | 0.7604 | 0.6822 | 298.3 ms | 0.5181 | 0.6324 |
+| Random | 0.2354 | 0.5384 | 554.8 ms | 0.5037 | 0.1674 |
+| Trust-only | 0.4833 | 0.8027 | 448.6 ms | 0.6440 | 0.4101 |
+| Capability-greedy | 0.7604 | 0.6030 | 289.2 ms | 0.4974 | 0.6324 |
+| Embedding-only | 0.7604 | 0.6822 | 319.5 ms | 0.5159 | 0.6324 |
+
+The `quality_proxy` is a routing/evaluation metric, **not** a claim of factual correctness or human preference. In the current synthetic evaluation, AgentWeave strongly improves latency/cost/trust versus several baselines while matching single-best coverage, but the quality proxy is slightly below the single-best baseline. This result is intentionally reported as measured.
+
+Generated research artifacts:
+
+- `research-evaluation.json`
+- `research-evaluation.csv`
+- `research-evaluation.md`
+- `research-coverage.svg`
+- `research/METHODOLOGY.md`
+- `research/benchmark_cases.json`
+
+### Security, storage, identity, governance, and reliability
+
+The latest Deep Proof run also completed successfully for:
+
+- red-team + Docker/Bubblewrap sandbox proof;
+- identity, VC, revocation, KMS boundary, and attestation proof;
+- PostgreSQL concurrency, recovery, replica-aware behavior, and audit durability proof;
+- result-verification quality/calibration proof;
+- governance policy scenarios;
+- disappearing/slow/malformed/network/database/process recovery chaos scenarios.
+
+A passing proof means the configured control behaved as expected in that test runtime. It is **not** a formal security certification, HA certification, or hardware-attestation certification.
+
+## What data is used?
+
+AgentWeave deliberately separates **real integration evidence** from **synthetic research/scalability data**.
+
+**Real execution evidence** includes:
+
+- public-internet A2A calls to independently hosted services;
+- live cross-SDK agent servers in CI;
+- official A2A TCK execution;
+- a real PostgreSQL service in CI;
+- Docker/runtime isolation behavior;
+- physical execution of 10K/100K/1M synthetic agent records.
+
+**Synthetic data** currently includes:
+
+- capability/trust/cost/latency distributions for scale tests;
+- research routing scenarios;
+- malicious Agent Cards, Sybil clusters, poisoned reputation, Byzantine responses, and other adversarial fixtures.
+
+A future research milestone is evaluation on larger public real-task corpora and real agent/task traces with known outcomes.
+
+## Getting started
+
+### Install
 
 ```bash
 python -m pip install -e '.[dev]'
@@ -64,7 +250,7 @@ Optional integrations:
 python -m pip install -e '.[security,api,tck,grpc,native,postgres,aws,observability,edge,yaml,ontology]'
 ```
 
-## Minimal example
+### Minimal example
 
 ```python
 import asyncio
@@ -73,22 +259,30 @@ from agentweave import AgentWeave, AgentProfile, Capability, InMemoryA2AAdapter
 async def main():
     bus = InMemoryA2AAdapter()
     weave = AgentWeave(a2a=bus, db_path=':memory:')
-    agent = AgentProfile('research-1', 'Research Agent', [Capability('research', .9, True)])
+
+    agent = AgentProfile(
+        'research-1',
+        'Research Agent',
+        [Capability('research', .9, True)],
+    )
+
     weave.register(agent)
-    bus.register_handler('research-1', lambda task: {'result': 'evidence-backed finding', 'decision': 'accept'})
-    result = await weave.solve('Research the topic', rounds=1, semantic_verify=True)
+    bus.register_handler(
+        'research-1',
+        lambda task: {'result': 'evidence-backed finding', 'decision': 'accept'},
+    )
+
+    result = await weave.solve(
+        'Research the topic',
+        rounds=1,
+        semantic_verify=True,
+    )
     print(result)
 
 asyncio.run(main())
 ```
 
-## A2A protocol depth
-
-`LongRunningA2AClient` implements JSON-RPC and HTTP+JSON lifecycle operations including retries, streaming, task subscription, polling/resume, task listing and cancellation. `GrpcA2ALifecycleClient` works with the generated A2A protobuf module and gRPC stub so AgentWeave is not coupled to one SDK package layout. `PushNotificationConfigClient` manages task webhook configuration, while `PushNotificationReceiver` provides an HMAC-capable ASGI receiver.
-
-The **AgentWeave Deep Proof** workflow launches the AgentWeave A2A SUT and runs the official A2A TCK MUST-level JSON-RPC suite. The **A2A SDK Interoperability Proof** independently launches upstream Python, Go, JavaScript and Java A2A agents and proves Agent Card discovery plus live invocation. The **Protocol Depth Proof** contract-tests the complete gRPC lifecycle dispatch surface and push receiver without pretending that a contract test is an external gRPC server proof.
-
-## Security and reliability proof
+## Run the proof suites locally
 
 ```bash
 python scripts/security_proof.py
@@ -96,42 +290,21 @@ python scripts/identity_proof.py
 python scripts/chaos_proof.py
 python scripts/governance_proof.py
 python scripts/verification_proof.py
-```
-
-A passing proof means the tested control behaved as configured on that runtime; it is not a formal security certification. Production deployments should still use hardened container/VM runtimes, workload identity, secret management, signed images and network policy appropriate to their threat model.
-
-## PostgreSQL proof
-
-```bash
-export AGENTWEAVE_POSTGRES_DSN='postgresql://agentweave:agentweave@127.0.0.1:5432/agentweave'
-python scripts/storage_proof.py
-```
-
-The proof performs concurrent writes, outcome/audit transactions, process reconnect/recovery and write-through replication into an isolated replica namespace. This validates AgentWeave replication/recovery behavior against a real PostgreSQL service; it is not a claim of multi-node PostgreSQL HA certification.
-
-## Research publication package
-
-```bash
 python scripts/research_evaluation.py
 ```
 
-This generates:
-
-- `research-evaluation.json` — complete machine-readable experiment and raw rows.
-- `research-evaluation.csv` — per-case/per-method data.
-- `research-evaluation.md` — paper-friendly aggregate table and confidence intervals.
-- `research-coverage.svg` — dependency-free benchmark figure.
-- `research/METHODOLOGY.md` and `research/benchmark_cases.json` — versioned experimental protocol and dataset.
-
-The declared `quality_proxy` is a routing metric, not a claim of human-equivalent factual correctness.
-
-## Physical scale suite
+Scale suite:
 
 ```bash
 PYTHONPATH=cpp/build python scripts/scale_suite.py --sizes 10000,100000,1000000
 ```
 
-The workflow physically processes the requested population in bounded-memory batches and never relabels a smaller population as a larger measurement. Output includes ranking wall time, agents/second, peak RSS, team-selection throughput, graph-ingestion sample throughput and Python/native C++ speedup where the native extension is available. The graph-ingestion metric reports its explicit sample size rather than presenting a bounded sample as a million-node retained graph.
+PostgreSQL proof:
+
+```bash
+export AGENTWEAVE_POSTGRES_DSN='postgresql://agentweave:agentweave@127.0.0.1:5432/agentweave'
+python scripts/storage_proof.py
+```
 
 ## CLI / SDK
 
@@ -146,24 +319,27 @@ agentweave solve --semantic-verify "Research and verify this topic"
 
 `AgentWeaveSDK.API_VERSION` defines the high-level SDK contract. See `docs/API_COMPATIBILITY.md` for compatibility/deprecation rules and `examples/plugin_example.py` for a plugin skeleton.
 
-## External proof boundary
+## External environment boundaries
 
-Some claims cannot be truthfully manufactured by repository code alone. AgentWeave therefore fails closed and keeps **implemented proof harnesses** separate from **executed external evidence**:
+Repository code cannot manufacture external evidence. These proofs require real infrastructure:
 
-- Independently hosted third-party A2A agents require two or more actual remote Agent Card URLs via `AGENTWEAVE_EXTERNAL_A2A_TARGETS` and the `External Environment Proof` workflow.
-- Real AWS Bedrock, Microsoft Foundry and Google Cloud Marketplace proof requires valid account credentials/procured Agent Card URLs.
-- Physical Jetson/Raspberry Pi/NPU evidence requires a registered self-hosted `agentweave-edge` runner with the selected runtime/model installed.
-- Live DID/KMS/HSM/TPM/TEE evidence requires the corresponding external resolver or attestation infrastructure.
+- AWS Bedrock / Microsoft Foundry / Google Cloud marketplace tests require valid credentials and procured/configured agents.
+- Physical Jetson / Raspberry Pi / NPU measurements require a registered self-hosted `agentweave-edge` runner and actual hardware.
+- Live KMS/HSM/TPM/TEE evidence requires the corresponding external infrastructure.
 
-The code and workflows for those proofs are present, but the README does not label them "proven" until their real external target is configured and successfully exercised.
+The workflows fail closed or skip gated jobs when these resources are absent rather than reporting synthetic success.
 
-## Deployment template
+## Deployment
 
-`deploy/docker-compose.yml` provides local PostgreSQL and Ollama services for integration/development environments.
+`deploy/docker-compose.yml` provides PostgreSQL and Ollama services for local integration/development environments.
 
 ## Release engineering
 
-AgentWeave follows Semantic Versioning. `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md` and `docs/API_COMPATIBILITY.md` define release and maintenance policy. Pushing a `vX.Y.Z` tag triggers the Release workflow, which tests, builds, validates, creates a GitHub release and uses PyPI trusted publishing when configured.
+AgentWeave follows Semantic Versioning. `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, `CITATION.cff`, and `docs/API_COMPATIBILITY.md` define release and maintenance policy. A `vX.Y.Z` tag triggers the release workflow, distribution validation, GitHub Release creation, and PyPI trusted publishing when configured.
+
+## Contributing
+
+Contributions, interoperability reports, new marketplace adapters, benchmark scenarios, security tests, and real-world evaluation datasets are welcome. See `CONTRIBUTING.md`.
 
 ## License
 
