@@ -17,6 +17,22 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 >
 > **AgentWeave adds:** which agents should communicate for this requirement, how confident are we in that requirement interpretation, can the agents be trusted, where should they execute, and how should their outputs be validated and learned from?
 
+## Cross-benchmark routing evidence
+
+AgentWeave is evaluated across three independent public benchmark distributions — **AgentBench, ToolBench, and AgencyBench** — to test whether the same routing framework generalizes across specialist selection, tool/API retrieval, and capability-family routing rather than being tuned to a single benchmark shape.
+
+| Benchmark | Routing problem | Current AgentWeave result |
+|---|---|---|
+| **AgentBench** | Blind specialist selection | **52.0%** blind Hit@1; **89.9%** accuracy on committed routes at **46.3%** coverage |
+| **ToolBench** | Tool/API retrieval over 4,856 APIs | **35.8% Hit@1**, **47.5% Hit@3**, **53.8% Hit@5**, MRR **0.440** |
+| **AgencyBench** | Capability-family routing | **57.0%** zero-shot Hit@1; **67.2%** cumulative-context Hit@1; **92.2%** cumulative-context Hit@3 |
+
+**Research takeaway:** the same capability-, knowledge-, confidence-, and evidence-aware routing architecture generalizes across agent selection, tool retrieval, and multi-stage capability routing on three structurally different external benchmarks.
+
+These are **routing/selection metrics**, not direct replacements for the end-to-end task-success metrics reported in the original AgentBench, ToolBench, and AgencyBench papers. The current evidence supports the narrower claim that AgentWeave can reduce heterogeneous candidate spaces to relevant specialists before execution; it does **not** claim that its routing percentages directly outperform the papers' end-to-end agent scores.
+
+The next research step is to connect this selection evidence to benchmark-native execution: **task → candidate discovery → capability/trust ranking → selected agent/tool/team → execution → native judge → outcome-driven reputation update**.
+
 ## Why AgentWeave?
 
 Communication alone does not solve agent selection. Real agent ecosystems contain heterogeneous agents with different expertise, trust, costs, latency, execution locations, security boundaries, and implementation stacks.
