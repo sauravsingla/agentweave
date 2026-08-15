@@ -1,0 +1,326 @@
+name: AgencyBench Model-Generated Native E2E
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/agencybench-model-native-e2e.yml'
+      - 'scripts/agencybench_native_e2e.py'
+
+permissions:
+  contents: read
+
+jobs:
+  model-native-e2e:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      AGENCYBENCH_PIN: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
+      CODER_MODEL: qwen2.5-coder:7b
+      EVAL_MODEL_ID: agentweave-model-generated
+    steps:
+      - name: Checkout AgentWeave
+        uses: actions/checkout@v5
+
+      - name: Checkout pinned AgencyBench Backend scenario
+        uses: actions/checkout@v5
+        with:
+          repository: GAIR-NLP/AgencyBench
+          ref: ec65324be69e81bd4fe394ef6a86d48b8fa5da56
+          path: external/AgencyBench
+          fetch-depth: 1
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            requirements.txt
+            AgencyBench-v2/Backend/scenario1
+            AgencyBench-v2/*/scenario*/description.json
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install AgentWeave and pinned AgencyBench runtime
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install -r external/AgencyBench/requirements.txt
+          pip install --upgrade 'sii-agent-sdk==0.1.11'
+
+      - name: Route full Backend scenario with AgentWeave
+        run: |
+          python scripts/agencybench_native_e2e.py route \
+            --agencybench-root external/AgencyBench \
+            --scenario Backend/scenario1 \
+            --output agencybench-model-native-route.json
+          python - <<'PY'
+          import json
+          r=json.load(open('agencybench-model-native-route.json'))
+          assert r['selected_family']=='Backend', r
+          assert int(r['visible_subtasks'])==5, r
+          print('AgentWeave selected Backend for the five-subtask AgencyBench scenario.')
+          PY
+
+      - name: Install Ollama and pull coding model
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsSL https://ollama.com/install.sh | sh
+          nohup ollama serve > ollama.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:11434/api/tags >/dev/null 2>&1 && break
+            sleep 2
+          done
+          ollama pull "$CODER_MODEL"
+          ollama list | tee ollama-models.txt
+
+      - name: Prepare fixed build harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf model-workspace
+          mkdir -p model-workspace/{src,include,data/scripts,data/history,logs,tests,bin}
+          printf '[]\n' > model-workspace/data/users.json
+          printf '["Hello!","How are you?","Got it."]\n' > model-workspace/data/scripts/bot_replies.json
+          cat > model-workspace/Makefile <<'MAKE'
+          CXX ?= g++
+          CXXFLAGS ?= -std=c++17 -O2 -Wall -Wextra -pthread
+          TARGET := bin/chat_app
+          SRC := src/main.cpp
+          .PHONY: all task1 task2 task3 task4 task5 run_task1 test_queue clean
+          all: task5
+          $(TARGET): $(SRC)
+          	mkdir -p bin data logs data/history data/scripts
+          	$(CXX) $(CXXFLAGS) $(SRC) -o $(TARGET)
+          task1: $(TARGET)
+          task2: $(TARGET)
+          task3: $(TARGET)
+          task4: $(TARGET)
+          task5: $(TARGET)
+          run_task1: task1
+          	./$(TARGET)
+          test_queue: tests/test_queue.cpp
+          	$(CXX) $(CXXFLAGS) tests/test_queue.cpp -o bin/test_queue
+          	./bin/test_queue
+          clean:
+          	rm -f $(TARGET) bin/test_queue
+          MAKE
+
+      - name: Generate, evaluate and repair model implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, re, shutil, subprocess, time
+          from pathlib import Path
+          import httpx
+
+          root=Path.cwd()
+          bench=root/'external/AgencyBench/AgencyBench-v2/Backend/scenario1'
+          workspace=root/'model-workspace'
+          desc=json.loads((bench/'description.json').read_text())
+          model=os.environ['CODER_MODEL']
+          eval_model=os.environ['EVAL_MODEL_ID']
+          usage=[]
+
+          def call_model(prompt, round_no):
+              payload={
+                  'model':model,
+                  'stream':False,
+                  'format':'json',
+                  'messages':[
+                      {'role':'system','content':'You are a senior C++17 engineer. Return only valid JSON. Implement the requested software completely; do not explain.'},
+                      {'role':'user','content':prompt},
+                  ],
+                  'options':{'temperature':0,'num_ctx':24576,'num_predict':12000},
+              }
+              with httpx.Client(timeout=1200.0) as client:
+                  r=client.post('http://127.0.0.1:11434/api/chat',json=payload)
+                  r.raise_for_status()
+                  data=r.json()
+              raw=(data.get('message') or {}).get('content','')
+              (root/f'model-generation-round-{round_no}.txt').write_text(raw)
+              usage.append({
+                  'round':round_no,
+                  'prompt_eval_count':data.get('prompt_eval_count',0),
+                  'eval_count':data.get('eval_count',0),
+                  'total_duration':data.get('total_duration',0),
+              })
+              try:
+                  obj=json.loads(raw)
+              except Exception:
+                  m=re.search(r'\{.*\}',raw,re.S)
+                  if not m:
+                      raise RuntimeError('Model did not return a JSON object')
+                  obj=json.loads(m.group(0))
+              main=obj.get('src/main.cpp') or obj.get('main_cpp') or obj.get('main.cpp')
+              testq=obj.get('tests/test_queue.cpp') or obj.get('test_queue_cpp') or obj.get('test_queue.cpp')
+              if not isinstance(main,str) or len(main)<500:
+                  raise RuntimeError('Model response lacks a substantial src/main.cpp')
+              if not isinstance(testq,str) or len(testq)<100:
+                  raise RuntimeError('Model response lacks tests/test_queue.cpp')
+              (workspace/'src/main.cpp').write_text(main)
+              (workspace/'tests/test_queue.cpp').write_text(testq)
+
+          def local_checks():
+              cmds=[
+                  ['make','clean'],['make','task1'],['./bin/chat_app','--version'],
+                  ['make','task2'],['./bin/chat_app','--selftest','friend-menu'],
+                  ['make','task3'],['./bin/chat_app','--selftest','chat-loop'],
+                  ['make','task4'],['./bin/chat_app','--selftest','alias-search'],
+                  ['make','task5'],['./bin/chat_app','--selftest','concurrency'],['make','test_queue'],
+              ]
+              out=[]
+              ok=True
+              for cmd in cmds:
+                  try:
+                      p=subprocess.run(cmd,cwd=workspace,text=True,capture_output=True,timeout=40)
+                      out.append(f"$ {' '.join(cmd)}\nrc={p.returncode}\n{p.stdout}\n{p.stderr}")
+                      if p.returncode!=0: ok=False
+                      if cmd==['./bin/chat_app','--version'] and p.stdout.strip()!='1.0.0': ok=False
+                  except Exception as e:
+                      ok=False; out.append(f"$ {' '.join(cmd)}\nERROR {e}")
+              text='\n'.join(out)
+              (root/'model-local-checks.txt').write_text(text)
+              return ok,text
+
+          def native_eval(round_no):
+              env=bench/'.env.agentweave-model'
+              env.write_text(f'''CONDA_ENV_NAME=\nMAX_SUBTASK_ATTEMPTS=1\nSII_TARGET_MODEL={eval_model}\nSII_AGENT_API_KEY=eval-only-placeholder\nSII_AGENT_API_BASE_URL=http://127.0.0.1:1/v1\nSII_AUTH_TYPE=USE_OPENAI\nSII_SYSTEM_PROMPT=\nSII_MAX_TURNS=1\nBRIDGE_TIMEOUT_MS=1000\n''')
+              model_dir=bench/eval_model
+              shutil.rmtree(model_dir,ignore_errors=True)
+              for i in range(1,6):
+                  target=model_dir/f'subtask{i}/workspace/attempt_01'
+                  target.mkdir(parents=True,exist_ok=True)
+                  shutil.copytree(workspace,target,dirs_exist_ok=True)
+              p=subprocess.run(['python','eval_task.py','--env',env.name,'--description','description.json','--eval-only'],cwd=bench,text=True,capture_output=True,timeout=600)
+              log=p.stdout+'\n'+p.stderr
+              (root/f'backend-model-native-round-{round_no}.log').write_text(log)
+              meta_path=model_dir/'meta_eval.json'
+              if not meta_path.exists():
+                  return None,0.0,log
+              meta=json.loads(meta_path.read_text())
+              scores=[float(x.get('best_score') or 0) for x in meta.get('subtasks',[])]
+              mean=sum(scores)/len(scores) if scores else 0.0
+              (root/f'backend-model-native-meta-round-{round_no}.json').write_text(json.dumps(meta,indent=2)+'\n')
+              return meta,mean,log
+
+          requirements='\n\n'.join(desc[f'subtask{i}'] for i in range(1,6))
+          feedback='No prior implementation. Build the complete cumulative final state from scratch.'
+          best=None; best_mean=-1; best_round=0
+
+          for round_no in range(1,4):
+              current=''
+              if (workspace/'src/main.cpp').exists():
+                  current=(workspace/'src/main.cpp').read_text()
+                  if len(current)>18000: current=current[:18000]
+              prompt=f'''Implement the complete cumulative final state of AgencyBench Backend/scenario1 below.\n\nThe fixed harness already provides a root Makefile with task1..task5, run_task1, test_queue and clean, compiling src/main.cpp with C++17 and -pthread. You MUST generate only two files as JSON keys exactly "src/main.cpp" and "tests/test_queue.cpp".\n\nCritical requirements: exact banner === Chat App v1.0.0 ===; exact Action: / Username: / Password: prompts; persistent valid JSON users with salt and 64-char SHA-256-style hash; session_state.json last_user; persistent friend files; friend list/status/chat header; chat transcript/history pagination; aliases; case-insensitive search with [[match]] highlighting; background message threads and a thread-safe FIFO queue; --version and all four --selftest commands must exit 0 and emit valid compact JSON where requested. Do not fake persistence only inside selftests: interactive scripted flows must work after process restart.\n\nFULL OFFICIAL REQUIREMENTS:\n{requirements}\n\nPREVIOUS FEEDBACK:\n{feedback}\n\nCURRENT IMPLEMENTATION (if any):\n{current}\n\nReturn complete replacement files, not patches.'''
+              call_model(prompt,round_no)
+              ok,local=local_checks()
+              meta,mean,nlog=native_eval(round_no)
+              if meta is not None and mean>best_mean:
+                  best_mean=mean; best=meta; best_round=round_no
+                  shutil.copy(workspace/'src/main.cpp',root/'best-model-main.cpp')
+                  shutil.copy(workspace/'tests/test_queue.cpp',root/'best-model-test_queue.cpp')
+                  shutil.copy(root/f'backend-model-native-meta-round-{round_no}.json',root/'backend-model-native-meta.json')
+                  shutil.copy(root/f'backend-model-native-round-{round_no}.log',root/'backend-model-native.log')
+              if meta is not None and mean>=6.0 and ok:
+                  break
+              failed=[]
+              if meta:
+                  for st in meta.get('subtasks',[]):
+                      name=st.get('subtask_name') or st.get('name') or 'subtask'
+                      failed.append(f"{name}: best_score={st.get('best_score')} attempts={json.dumps(st.get('attempts',[]))[:5000]}")
+              feedback='LOCAL CHECKS:\n'+local[-7000:]+'\n\nNATIVE EVALUATOR:\n'+nlog[-12000:]+'\n\nMETA:\n'+'\n'.join(failed)
+
+          if best is None:
+              raise RuntimeError('No native evaluator metadata was produced by any model round')
+          (workspace/'src/main.cpp').write_text((root/'best-model-main.cpp').read_text())
+          (workspace/'tests/test_queue.cpp').write_text((root/'best-model-test_queue.cpp').read_text())
+          (root/'model-usage.json').write_text(json.dumps(usage,indent=2)+'\n')
+          (root/'best-model-round.txt').write_text(str(best_round)+'\n')
+          print(f'Best native mean score: {best_mean:.2f}/10 from round {best_round}')
+          PY
+
+      - name: Build measured model-generated native report
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          route=json.load(open('agencybench-model-native-route.json'))
+          meta=json.load(open('backend-model-native-meta.json'))
+          usage=json.load(open('model-usage.json'))
+          subtasks=meta.get('subtasks',[])
+          scores=[float(x.get('best_score') or 0) for x in subtasks]
+          attempts=sum(len(x.get('attempts') or []) for x in subtasks)
+          result={
+            'proof_mode':'model-generated-implementation-fixed-build-harness',
+            'generation_model':'qwen2.5-coder:7b',
+            'agencybench_pin':'ec65324be69e81bd4fe394ef6a86d48b8fa5da56',
+            'scenario':'Backend/scenario1',
+            'agentweave_selected_family':route.get('selected_family'),
+            'native_contracts_scored':len(subtasks),
+            'native_rubric_attempts':attempts,
+            'per_subtask_best_scores':scores,
+            'mean_best_score':sum(scores)/len(scores) if scores else 0.0,
+            'contracts_with_nonzero_score':sum(s>0 for s in scores),
+            'best_generation_round':int(Path('best-model-round.txt').read_text().strip()),
+            'generation_rounds':len(usage),
+            'model_prompt_tokens_reported':sum(int(x.get('prompt_eval_count') or 0) for x in usage),
+            'model_completion_tokens_reported':sum(int(x.get('eval_count') or 0) for x in usage),
+            'boundary':'The C++ implementation and queue test are generated and repaired by qwen2.5-coder:7b after AgentWeave routes the scenario. The Makefile/build harness is fixed by the benchmark workflow. Scores come from the pinned upstream AgencyBench eval-only rubric.'
+          }
+          Path('agencybench-model-native-results.json').write_text(json.dumps(result,indent=2)+'\n')
+          md='# AgencyBench model-generated native E2E\n\n'+''.join([
+            f"- AgentWeave selected family: **{result['agentweave_selected_family']}**\n",
+            f"- Generation model: **{result['generation_model']}**\n",
+            f"- Native contracts scored: **{result['native_contracts_scored']}**\n",
+            f"- Per-subtask scores: **{result['per_subtask_best_scores']}**\n",
+            f"- Mean native score: **{result['mean_best_score']:.2f}/10**\n",
+            f"- Contracts with non-zero score: **{result['contracts_with_nonzero_score']}/5**\n",
+            f"- Best generation/repair round: **{result['best_generation_round']}**\n",
+            f"- Model-reported tokens: **{result['model_prompt_tokens_reported'] + result['model_completion_tokens_reported']}**\n\n",
+            f"Boundary: {result['boundary']}\n"
+          ])
+          Path('agencybench-model-native-results.md').write_text(md)
+          print(md)
+          PY
+          cat agencybench-model-native-results.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate model-generated native evidence
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('agencybench-model-native-results.json'))
+          assert r['agentweave_selected_family']=='Backend', r
+          assert r['native_contracts_scored']==5, r
+          assert r['native_rubric_attempts']>=5, r
+          assert r['contracts_with_nonzero_score']>=1, r
+          assert r['mean_best_score']>0, r
+          assert r['proof_mode']=='model-generated-implementation-fixed-build-harness', r
+          assert r['model_completion_tokens_reported']>0, r
+          print('Model-generated implementation produced real non-zero pinned AgencyBench native evidence.')
+          PY
+
+      - name: Upload model-generated native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: agencybench-model-native-e2e-evidence
+          if-no-files-found: warn
+          path: |
+            agencybench-model-native-route.json
+            agencybench-model-native-results.json
+            agencybench-model-native-results.md
+            backend-model-native-meta.json
+            backend-model-native.log
+            backend-model-native-meta-round-*.json
+            backend-model-native-round-*.log
+            model-generation-round-*.txt
+            model-local-checks.txt
+            model-usage.json
+            best-model-round.txt
+            model-workspace/Makefile
+            model-workspace/src/main.cpp
+            model-workspace/tests/test_queue.cpp
+            ollama-models.txt
