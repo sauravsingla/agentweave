@@ -216,24 +216,51 @@ A passing proof means the configured control behaved as expected in that test ru
 
 ## What data is used?
 
-AgentWeave deliberately separates **real integration evidence** from **synthetic research/scalability data**.
+AgentWeave distinguishes three different things that are easy to confuse: **real systems / real execution**, **real-world datasets**, and **synthetic benchmark data**.
 
-**Real execution evidence** includes:
+| Category | Current status | What AgentWeave uses today |
+|---|---|---|
+| **Real systems / real execution** | ✅ Used and tested | Independently hosted public A2A services, live upstream SDK agents, official A2A TCK, a real PostgreSQL service, and real Docker/runtime isolation behavior |
+| **Real-world task dataset** | ❌ Not yet included | No public corpus of real user tasks, real agent histories, or production task outcomes is currently used for the research-quality benchmark |
+| **Synthetic benchmark data** | ✅ Used | Generated agent populations, capabilities, trust values, latency/cost distributions, routing scenarios, and adversarial fixtures |
 
-- public-internet A2A calls to independently hosted services;
-- live cross-SDK agent servers in CI;
-- official A2A TCK execution;
-- a real PostgreSQL service in CI;
-- Docker/runtime isolation behavior;
-- physical execution of 10K/100K/1M synthetic agent records.
+### What “real” means in the current results
 
-**Synthetic data** currently includes:
+“Real” currently means that AgentWeave interacted with **actual external systems or infrastructure**, not that the research benchmark is based on a real-world dataset.
 
-- capability/trust/cost/latency distributions for scale tests;
-- research routing scenarios;
-- malicious Agent Cards, Sybil clusters, poisoned reputation, Byzantine responses, and other adversarial fixtures.
+The real execution evidence includes:
 
-A future research milestone is evaluation on larger public real-task corpora and real agent/task traces with known outcomes.
+- **Deep Research Archives:** AgentWeave discovered an independently hosted Agent Card over the public internet and completed a live structured A2A invocation.
+- **Delx Agent Operations Protocol:** AgentWeave used the live registration endpoint, received a runtime credential, and completed an authenticated A2A `message/send` call.
+- **Python / Go / JavaScript / Java A2A SDK agents:** actual upstream SDK implementations were launched in CI, discovered, and invoked.
+- **Official A2A TCK:** the official JSON-RPC MUST-level conformance suite was executed against AgentWeave as the system under test.
+- **PostgreSQL:** concurrency, transactional writes, recovery, replication/audit behavior, and reconnect logic were exercised against a real PostgreSQL service in CI.
+- **Docker/runtime security:** actual container/runtime isolation controls were executed rather than simulated.
+- **10K / 100K / 1M scale execution:** the benchmark physically processed those synthetic agent records; the execution is real even though the records themselves are synthetic.
+
+### What is synthetic today
+
+The current scalability and research evaluations use generated data. Synthetic fields include:
+
+- agent capability assignments from the pool `analysis`, `research`, `coding`, `summarization`, `planning`, `vision`, `retrieval`, and `verification`;
+- capability-strength/evidence values;
+- contextual trust-vector values;
+- cloud/edge execution placement;
+- latency and cost values;
+- research routing scenarios and expected capability requirements;
+- malicious Agent Cards and prompt-injection fixtures;
+- Sybil/collusion clusters;
+- poisoned reputation histories;
+- Byzantine/disagreement responses;
+- timeout, malformed-result, and other adversarial fixtures.
+
+The synthetic populations are generated reproducibly with fixed seeds where applicable so the benchmark can be repeated.
+
+### Real-world dataset status
+
+AgentWeave does **not yet claim evaluation on a real-world task dataset**. In particular, the current research numbers should not be interpreted as accuracy on real users, production agent traces, human-rated task outcomes, or an external public benchmark corpus.
+
+A future research milestone is to evaluate AgentWeave on public real-task corpora and/or independently collected agent-task traces with known outcomes, then report task success, quality, cost, latency, failure rate, and routing/team-selection improvement against the same baselines.
 
 ## Getting started
 
