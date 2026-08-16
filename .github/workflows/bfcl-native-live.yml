@@ -22,10 +22,10 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Install AgentWeave study dependencies
+      - name: Install AgentWeave and BFCL validation dependencies
         run: |
           pip install -e .[dev]
-          pip install 'sentence-transformers>=5.1,<6' 'bfcl-eval==2025.12.17'
+          pip install 'bfcl-eval==2025.12.17'
       - name: Run protocol and utility tests
         run: pytest -q tests/test_bfcl_native_live_study.py
       - name: Fetch pinned BFCL source and verify untouched sample
@@ -36,7 +36,7 @@ jobs:
           cd external-gorilla
           git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
           test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
-          cd ../external-gorilla/berkeley-function-call-leaderboard
+          cd berkeley-function-call-leaderboard
           pip install -e .
           cd ../..
           python scripts/bfcl_native_live_study.py \
@@ -51,6 +51,9 @@ jobs:
           else
             echo "OPENAI_API_KEY_AVAILABLE=false"
           fi
+      - name: Install semantic router dependencies for live run
+        if: ${{ env.OPENAI_API_KEY_LIVE != '' }}
+        run: pip install 'sentence-transformers>=5.1,<6'
       - name: Run preregistered live BFCL study
         if: ${{ env.OPENAI_API_KEY_LIVE != '' }}
         run: |
