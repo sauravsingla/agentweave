@@ -1,4 +1,9 @@
+import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from scripts.bfcl_native_live_study import exact_mcnemar, select_ids, wilson
 from scripts.bfcl_routing_proxy import _provider_group, _tool_name
