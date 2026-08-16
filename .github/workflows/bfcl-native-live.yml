@@ -1,4 +1,4 @@
-name: BFCL Native Local Study
+name: BFCL Native Fast Local Study
 
 on:
   pull_request:
@@ -15,7 +15,7 @@ env:
 jobs:
   bfcl-native-local:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,13 +35,13 @@ jobs:
           cd external-gorilla
           git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
           test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
-      - name: Verify frozen sample before model download
+      - name: Verify frozen fast sample before model download
         run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
             --output bfcl-native-live-results \
             --validate-only
-      - name: Run no-key local BFCL study
+      - name: Run no-key fast BFCL study
         run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
