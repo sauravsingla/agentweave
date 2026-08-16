@@ -1,0 +1,51 @@
+{
+  "protocol_version": 1,
+  "status": "preregistered-before-confirmatory-outcome-run",
+  "frozen_research_commit": "b502fbf803fc906ba4971324efd46bc6cfb91ab7",
+  "confirmatory_scope": "controlled executable team outcome benchmark",
+  "confirmatory_design": {
+    "seeds": 30,
+    "workloads_per_seed": 12,
+    "strategies": [
+      "agentweave-team",
+      "single-best-agent",
+      "random-team",
+      "capability-only-team"
+    ],
+    "primary_outcome": "task completion",
+    "secondary_outcomes": ["quality", "cost", "latency", "recovery success"],
+    "hypotheses": [
+      {
+        "id": "H1",
+        "statement": "AgentWeave optimized-team task completion exceeds every baseline by at least 20 percentage points across the preregistered repeated-seed workload runs."
+      },
+      {
+        "id": "H2",
+        "statement": "AgentWeave optimized-team mean delivered quality exceeds every baseline by at least 0.10 on the same repeated-seed workload runs."
+      },
+      {
+        "id": "H3",
+        "statement": "When an induced failure is actually exercised, AgentWeave recovery succeeds in at least 90% of opportunities."
+      }
+    ],
+    "statistics": {
+      "confidence_level": 0.95,
+      "completion_interval": "Wilson score interval",
+      "paired_effect_interval": "paired bootstrap, 10000 resamples, seed 20260816",
+      "paired_significance": "exact McNemar test for binary completion when paired observations are available"
+    }
+  },
+  "exploratory_external_routing_scope": {
+    "benchmark": "General-AgentBench frozen untouched evaluation",
+    "benchmark_commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "purpose": "post-hoc stronger semantic-router comparison on the already-frozen untouched task set; this is explicitly exploratory and is not represented as a preregistered untouched comparison",
+    "semantic_baselines": [
+      "sentence-transformers/all-MiniLM-L6-v2",
+      "BAAI/bge-small-en-v1.5"
+    ],
+    "baseline_design": "zero-shot nearest family-description embedding; no General-AgentBench label or example is used to fit the embedding baseline",
+    "statistics": ["Wilson 95% confidence intervals", "paired bootstrap accuracy-difference interval", "exact McNemar test"],
+    "failure_reporting": "store all AgentWeave errors and disagreements with each semantic baseline"
+  },
+  "evidence_boundary": "The confirmatory outcome benchmark physically executes controlled handlers over a synthetic agent catalog; it is an actual task-completion outcome within that benchmark, not a production-user or external-provider result. The semantic-router comparison is routing accuracy only and is exploratory/post-hoc because General-AgentBench had already been observed before these embedding baselines were added."
+}
