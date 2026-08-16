@@ -9,6 +9,8 @@ on:
 jobs:
   router-v2-transfer:
     runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
     steps:
       - uses: actions/checkout@v5
         with:
