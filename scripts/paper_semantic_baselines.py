@@ -5,7 +5,7 @@ import json
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from research.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
+from scripts.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
 from scripts.untouched_generalization import evaluate as evaluate_frozen
 from scripts.untouched_generalization import load_manifest, load_tasks, verify_router_frozen
 
