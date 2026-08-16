@@ -2,7 +2,7 @@
 
 **Knowledge-, capability-, trust-, policy-, and confidence-aware orchestration for heterogeneous AI agents.**
 
-AgentWeave is an open-source framework for discovering, validating, selecting, and orchestrating AI agents across cloud, marketplaces, enterprise environments, and edge devices. It uses **A2A as the interoperability layer** and adds requirement intelligence, contextual trust, capability/knowledge graphs, placement and team optimization, governance, result verification, reputation learning, observability, and sandboxing.
+AgentWeave is an open-source framework for discovering, validating, selecting, and orchestrating AI agents across cloud, marketplaces, enterprise environments, and edge devices. It uses **A2A as the interoperability layer** and adds requirement intelligence, contextual trust, capability/knowledge graphs, placement and team optimization, governance, result verification, reputation learning, observability, sandboxing, **automatic runtime failover**, and **durable checkpoint recovery for multi-step workflows**.
 
 [![CI](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml)
 [![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
@@ -16,7 +16,7 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 
 > **A2A answers:** how can agents communicate?
 >
-> **AgentWeave adds:** which agents should communicate for this requirement, how confident are we in that requirement interpretation, can the agents be trusted, where should they execute, and how should their outputs be validated and learned from?
+> **AgentWeave adds:** which agents should communicate for this requirement, how confident are we in that requirement interpretation, can the agents be trusted, where should they execute, what should happen when a selected agent fails, how should work resume, and how should outputs be validated and learned from?
 
 ## Cross-benchmark evidence
 
@@ -47,6 +47,8 @@ AgentWeave is designed to:
 - match requirements to agents using capabilities, domains, knowledge, placement, trust, cost, and latency;
 - form teams across coverage, trust, diversity, redundancy, cost, latency, and communication overhead;
 - orchestrate A2A task lifecycle, streaming, cancellation, resume, subscription, and push notifications;
+- detect runtime agent failure, record a negative trust/reputation outcome, re-rank remaining candidates, and automatically select a replacement;
+- persist multi-step workflow checkpoints and resume after process restart without replaying completed steps;
 - verify outputs using contradiction, citation/source-quality, uncertainty, NLI/verifier hooks, and consensus/conflict handling;
 - learn from outcomes using persistent reputation and dynamic re-testing.
 
@@ -74,7 +76,13 @@ Cloud / Marketplace / Enterprise / Edge Agents
                     │
                    A2A
                     │
- Streaming / Long-running / Push Tasks
+      Runtime Failure Detection
+                    │
+       Trust Update + Re-ranking
+                    │
+      Replacement Agent / Team
+                    │
+      Durable Checkpoint / Resume
                     │
    Consensus + Conflict Resolution
                     │
@@ -82,6 +90,103 @@ Cloud / Marketplace / Enterprise / Edge Agents
                     │
       Reputation + Dynamic Retesting
 ```
+
+## Runtime failover and durable workflow recovery
+
+AgentWeave now supports a closed-loop recovery path when a selected agent fails during execution. The recovery manager records the failed outcome immediately, updates the failed agent's trust/reputation, excludes already-attempted agents, re-ranks the remaining candidates using the updated state, invokes the best compatible replacement, and can continue to another replacement if the first backup also fails.
+
+The implemented runtime sequence is:
+
+```text
+requirement
+   ↓
+discover + rank candidates
+   ↓
+select Agent A
+   ↓
+Agent A fails
+   ↓
+detect failure
+   ↓
+negative trust/reputation update
+   ↓
+re-rank remaining candidates
+   ↓
+select Agent B
+   ↓
+retry / continue with prior successful context
+   ↓
+validate final outcome
+   ↓
+update reputation from the recovered result
+```
+
+| Failure/replacement behavior | Current support |
+|---|---:|
+| Chosen agent fails | ✅ |
+| AgentWeave detects the runtime failure | ✅ |
+| Failed-agent trust/reputation decreases automatically | ✅ |
+| Remaining candidates are re-ranked after the trust update | ✅ |
+| Replacement agent is selected automatically | ✅ |
+| Multiple replacement attempts are supported | ✅ |
+| Prior successful context is carried into recovery | ✅ |
+| Final recovered outcome is validated | ✅ |
+| Recovery events and effective agents are exposed in the result | ✅ |
+
+The integration test [`tests/test_runtime_recovery.py`](tests/test_runtime_recovery.py) proves both **primary → backup → success** and **primary → first backup fails → second backup → success**, including automatic trust degradation and recovery-event ordering.
+
+### Durable multi-step resume
+
+For workflows that must survive more than an individual invocation failure, `DurableAgentWeave` adds persistent workflow checkpoints. Each completed step is persisted before the scheduler advances. If the process stops or a step cannot complete, a fresh AgentWeave process can load the same checkpoint and continue from `next_step_index` without replaying already-completed steps.
+
+```text
+Step 1 ✅  ┐
+Step 2 ✅  │ persisted checkpoints
+Step 3 ✅  ┘
+Step 4 → Agent A fails ❌
+                ↓
+      failure + trust update persisted
+                ↓
+       process may restart
+                ↓
+       load workflow checkpoint
+                ↓
+       re-rank replacement agents
+                ↓
+       Agent B resumes Step 4
+                ↓
+Step 4 ✅
+Step 5 ✅
+```
+
+The public API is intentionally separate from the single-task `AgentWeave.solve()` path:
+
+```python
+from agentweave import DurableAgentWeave, WorkflowStep
+
+weave = DurableAgentWeave(db_path='agentweave.db')
+
+steps = [
+    WorkflowStep('collect', 'Collect evidence', {'research'}),
+    WorkflowStep('analyze', 'Analyze the evidence', {'analysis'}),
+    WorkflowStep('verify', 'Verify the conclusion', {'verification'}),
+]
+
+result = await weave.run_workflow(
+    steps,
+    workflow_id='case-42',
+    max_failovers=2,
+)
+
+# A fresh process can later continue the same workflow.
+result = await weave.resume_workflow('case-42', max_failovers=2)
+```
+
+Checkpoint persistence is available through the built-in SQLite store, PostgreSQL store, and replicated store path. The integration test [`tests/test_durable_workflow.py`](tests/test_durable_workflow.py) simulates a fresh process restart against the same durable database and verifies that completed steps are not replayed.
+
+**Execution semantics:** completed steps are durable from AgentWeave's scheduler perspective. If the entire process dies while a remote agent is executing the current step but before the result is checkpointed, that in-flight step is **at-least-once**. AgentWeave sends a stable `workflow_id:step_id` idempotency key so a remote implementation can deduplicate repeated side effects and provide end-to-end exactly-once behavior when it supports idempotency.
+
+**Evidence boundary:** the recovery behavior above is implemented and covered by automated failure-injection/integration tests. AgentWeave does not currently claim that the same failure/replacement sequence has been measured as a controlled outage inside an external production workload; that remains a useful next real-workload experiment.
 
 ## Requirement intelligence
 
