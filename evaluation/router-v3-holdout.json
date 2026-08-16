@@ -1,0 +1,50 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-run",
+  "router_v3_base_commit": "c940596cd0a9e4168cc301c32d47de7e40308d2e",
+  "development_data": {
+    "name": "General-AgentBench published baseline prompts",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "usage": "Router V3 may fit on these development prompts only; Router V2's 72-task holdout is not reused for scoring. Its observed failure mode may motivate benchmark-independent semantic anchors."
+  },
+  "external_holdout": [
+    {
+      "name": "MBPP",
+      "repository": "google-research/google-research",
+      "commit": "589e977488f21a336a3d3da9b96da91ddbcf935e",
+      "path": "mbpp/mbpp.jsonl",
+      "family": "swebench",
+      "count": 24
+    },
+    {
+      "name": "TruthfulQA",
+      "repository": "sylinrl/TruthfulQA",
+      "commit": "d71c110897f5d31c5d7f309e7bc316c152f6f031",
+      "path": "TruthfulQA.csv",
+      "family": "search",
+      "count": 24
+    },
+    {
+      "name": "OSWorld",
+      "repository": "xlang-ai/OSWorld",
+      "commit": "091f5ef1d5544bc74953c77875d5feb5bed30108",
+      "path": "evaluation_examples/examples",
+      "family": "terminalbench",
+      "count": 24
+    }
+  ],
+  "sampling_rule": "For each source, collect valid task prompts, compute SHA256(source_id + '\\n' + prompt), sort ascending by digest, and select the first 24. The rule is fixed before the first score.",
+  "label_visibility": "Source family labels are attached only after Router V2 and Router V3 predictions are produced.",
+  "primary_metric": "Router V3 family Hit@1 over the balanced 72-task external holdout",
+  "secondary_metrics": [
+    "Router V2 Hit@1 on the identical new holdout",
+    "absolute V3-V2 Hit@1 delta",
+    "macro family accuracy",
+    "per-family accuracy",
+    "mean confidence",
+    "confusion matrix"
+  ],
+  "anti_tuning_rule": "After the first successful scored run, Router V3 algorithm, anchors, weights, source pins, sampling rule, and selected task count are frozen for this holdout. Any changed router must be Router V4 with a new holdout.",
+  "evidence_boundary": "This is a task-family routing transfer test only. It does not claim native MBPP code correctness, TruthfulQA truthfulness accuracy, or OSWorld environment success."
+}
