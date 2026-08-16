@@ -8,8 +8,8 @@ from pathlib import Path
 # local keyless model server below.
 BFCL_HANDLER_MODEL_ID = "openbmb/MiniCPM-SALA-FC"
 LOCAL_MODEL_ID = "MadeAgents/Hammer2.1-0.5b"
-CATEGORY = "simple_python"
-SAMPLE_SEED = "agentweave-bfcl-native-v2-fast:"
+CATEGORY = "multiple"
+SAMPLE_SEED = "agentweave-bfcl-native-v3-multiple:"
 STRATEGIES = ("single-agent", "semantic-router", "agentweave")
 
 def load_jsonl(path): return [json.loads(x) for x in Path(path).read_text(encoding="utf-8").splitlines() if x.strip()]
