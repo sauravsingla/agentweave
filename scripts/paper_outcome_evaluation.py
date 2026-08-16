@@ -7,7 +7,7 @@ from collections import defaultdict
 from pathlib import Path
 from statistics import fmean
 
-from research.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
+from scripts.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
 from scripts.team_advantage_benchmark import DEFAULT_SEED, run_benchmark
 
 
