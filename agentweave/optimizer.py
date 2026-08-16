@@ -14,7 +14,12 @@ class TeamObjective:
     score: float
 
 class GlobalTeamOptimizer:
-    """Exact subset search for small candidate pools, greedy approximation for large ones."""
+    """Exact subset search for small candidate pools, greedy approximation for large ones.
+
+    Only candidates that match at least one required capability are eligible for a
+    team. This prevents an otherwise high-trust or diverse but task-irrelevant agent
+    from increasing the team objective without contributing requirement coverage.
+    """
     def __init__(self,exact_limit=18): self.exact_limit=exact_limit
     def evaluate(self,req,team):
         required=set(req.capabilities); covered=set(); trusts=[]; locations=set(); caps=[]; latency=0.0; cost=0.0
@@ -28,7 +33,8 @@ class GlobalTeamOptimizer:
         score=.42*coverage+.18*trust+.10*diversity+.10*(1-redundancy)+.08*latency_score+.07*cost_score+.05*communication_score
         return TeamObjective(coverage,trust,diversity,redundancy,latency_score,cost_score,communication_score,score)
     def select(self,req,ranked,max_agents=5):
-        ranked=[r for r in ranked if r.score>0]
+        required=set(req.capabilities)
+        ranked=[r for r in ranked if r.score>0 and (set(r.matched_capabilities) & required)]
         if not ranked: return []
         if len(ranked)<=self.exact_limit:
             best=None; best_obj=None
