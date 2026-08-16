@@ -1,4 +1,4 @@
-name: BFCL Native Live Study
+name: BFCL Native Local Study
 
 on:
   pull_request:
@@ -9,12 +9,13 @@ permissions:
 
 env:
   PYTHONPATH: .
-  OPENAI_API_KEY_LIVE: ${{ secrets.OPENAI_API_KEY }}
+  HF_HOME: ${{ github.workspace }}/.hf-cache
+  TOKENIZERS_PARALLELISM: 'false'
 
 jobs:
-  bfcl-native-live:
+  bfcl-native-local:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
         with:
@@ -22,51 +23,32 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - name: Install AgentWeave validation dependencies
-        run: pip install -e .[dev]
+      - name: Install study dependencies
+        run: |
+          pip install -e .[dev]
+          pip install 'bfcl-eval==2025.12.17' 'transformers>=4.47,<6' 'sentence-transformers>=5.1,<6' torch
       - name: Run protocol and utility tests
         run: pytest -q tests/test_bfcl_native_live_study.py
-      - name: Fetch pinned BFCL source and verify untouched sample
-        shell: bash
+      - name: Fetch pinned BFCL source
         run: |
-          set -euo pipefail
           git clone --filter=blob:none https://github.com/ShishirPatil/gorilla.git external-gorilla
           cd external-gorilla
           git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
           test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
-          cd ..
+      - name: Verify frozen sample before model download
+        run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
             --output bfcl-native-live-results \
             --validate-only
-      - name: Report live credential availability
-        shell: bash
-        run: |
-          if [ -n "${OPENAI_API_KEY_LIVE:-}" ]; then
-            echo "OPENAI_API_KEY_AVAILABLE=true"
-          else
-            echo "OPENAI_API_KEY_AVAILABLE=false"
-          fi
-      - name: Install pinned BFCL live dependencies
-        if: ${{ env.OPENAI_API_KEY_LIVE != '' }}
-        run: pip install -e external-gorilla/berkeley-function-call-leaderboard
-      - name: Run preregistered live BFCL study
-        if: ${{ env.OPENAI_API_KEY_LIVE != '' }}
+      - name: Run no-key local BFCL study
         run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
             --output bfcl-native-live-results
-      - name: Mark live study pending when no provider credential exists
-        if: ${{ env.OPENAI_API_KEY_LIVE == '' }}
-        run: |
-          cat > bfcl-native-live-results/LIVE_RUN_PENDING.md <<'EOF'
-          # Live provider run pending
-
-          The BFCL protocol, benchmark commit, sample rule, model snapshot, strategies, statistics, and price schedule are frozen. No `OPENAI_API_KEY` repository secret was available to this workflow, so no live score, latency, token usage, or provider-priced cost has been fabricated.
-          EOF
-      - name: Upload BFCL native study evidence
+      - name: Upload BFCL native local evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bfcl-native-live-evidence
+          name: bfcl-native-local-evidence
           path: bfcl-native-live-results/
