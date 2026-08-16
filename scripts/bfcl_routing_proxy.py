@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -33,13 +32,13 @@ def _tool_name(tool: dict[str, Any]) -> str:
 
 def _provider_group(name: str) -> str:
     clean = name.replace(".", "_")
-    # BFCL tool names commonly preserve class/provider prefixes. Keep the
-    # longest stable prefix rather than grouping every function separately.
     bits = [b for b in clean.split("_") if b]
     if len(bits) <= 1:
         return clean
-    if bits[0].lower().startswith("gorilla") and len(bits) >= 2:
-        return "_".join(bits[:2])
+    # BFCL class/provider names such as GorillaFileSystem and TwitterAPI are
+    # the stable agent boundary; suffixes are individual functions.
+    if bits[0].lower().startswith("gorilla"):
+        return bits[0]
     if bits[0].lower().endswith("api"):
         return bits[0]
     return bits[0]
@@ -119,8 +118,6 @@ class Router:
             local_scores = self._similarities(query, [_tool_text(t) for t in selected])
             order = sorted(range(len(selected)), key=lambda i: (-local_scores[i], _tool_name(selected[i])))
             selected = [selected[i] for i in order[: self.max_tools]]
-        # Safety against an accidental empty tool set: preserve at least the
-        # strongest semantically relevant tool, without consulting BFCL labels.
         if not selected:
             local_scores = self._similarities(query, [_tool_text(t) for t in tools])
             best = max(range(len(tools)), key=lambda i: local_scores[i])
