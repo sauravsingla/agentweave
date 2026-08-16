@@ -43,6 +43,7 @@ class RuntimeRecoveryManager:
             return {
                 'effective_team': list(team),
                 'final_results': list(final_results),
+                'attempt_results': [],
                 'events': [],
                 'failed_agent_ids': [],
                 'recovered_agent_ids': [],
@@ -53,6 +54,7 @@ class RuntimeRecoveryManager:
         failed_members = [m for m in team if not final_by_id.get(m.agent.agent_id, {}).get('success')]
         effective_team = list(successful_members)
         effective_results = [final_by_id[m.agent.agent_id] for m in successful_members]
+        attempt_results = []
         events = []
         failed_agent_ids = []
         recovered_agent_ids = []
@@ -124,6 +126,7 @@ class RuntimeRecoveryManager:
                         'replaces': failed_id,
                         'recovery_attempt': attempt,
                     }
+                    attempt_results.append(replacement_result)
                     effective_team.append(replacement)
                     effective_results.append(replacement_result)
                     recovered_agent_ids.append(replacement_id)
@@ -146,6 +149,7 @@ class RuntimeRecoveryManager:
                         'replaces': failed_id,
                         'recovery_attempt': attempt,
                     }
+                    attempt_results.append(last_failed_result)
                     self._record_outcome(
                         replacement.agent,
                         False,
@@ -163,6 +167,7 @@ class RuntimeRecoveryManager:
         return {
             'effective_team': effective_team,
             'final_results': effective_results,
+            'attempt_results': attempt_results,
             'events': events,
             'failed_agent_ids': failed_agent_ids,
             'recovered_agent_ids': recovered_agent_ids,
