@@ -26,7 +26,7 @@ jobs:
       - name: Install study dependencies
         run: |
           pip install -e .[dev]
-          pip install 'bfcl-eval==2025.12.17' 'transformers>=4.47,<6' 'sentence-transformers>=5.1,<6' torch
+          pip install 'bfcl-eval==2025.12.17' 'transformers>=4.47,<6' 'sentence-transformers>=5.1,<6' torch soundfile
       - name: Run protocol and utility tests
         run: pytest -q tests/test_bfcl_native_live_study.py
       - name: Fetch pinned BFCL source
