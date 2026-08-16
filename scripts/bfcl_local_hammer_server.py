@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import time
 import uuid
@@ -12,7 +13,7 @@ from typing import Any
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-MODEL_ID = "MadeAgents/Hammer2.1-0.5b"
+MODEL_ID = os.environ.get("LOCAL_MODEL_ID", "MadeAgents/Hammer2.1-1.5b")
 
 
 def _strip_tools(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -94,10 +95,8 @@ class LocalHammer:
                     {"id": f"call_{uuid.uuid4().hex[:12]}", "type": "function", "function": {"name": c["name"], "arguments": json.dumps(c["arguments"], separators=(",", ":"))}}
                     for c in calls
                 ]}
-                finish = "tool_calls"
             else:
                 message = {"role": "assistant", "content": text}
-                finish = "stop"
             return message, prompt_n, int(gen.shape[-1]), elapsed
 
 
