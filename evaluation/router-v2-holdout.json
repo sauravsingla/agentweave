@@ -1,0 +1,58 @@
+{
+  "protocol_version": 1,
+  "status": "preregistered-before-first-scored-run",
+  "router_name": "PrototypeFamilyRouterV2",
+  "router_source": "research/router_v2.py",
+  "development_source": {
+    "name": "General-AgentBench",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "use": "development/training only",
+    "families": ["mathhay", "mcpbench", "search", "swebench", "tau2bench", "terminalbench"]
+  },
+  "external_holdout": {
+    "sampling": "first 24 published tasks from each source in repository order; 72 tasks total",
+    "label_visibility": "source/family labels are withheld until after prediction",
+    "sources": [
+      {
+        "family": "mathhay",
+        "name": "GSM8K",
+        "repository": "openai/grade-school-math",
+        "commit": "3101c7d5072418e28b9008a6636bde82a006892c",
+        "path": "grade_school_math/data/test.jsonl",
+        "text_field": "question",
+        "tasks": 24
+      },
+      {
+        "family": "swebench",
+        "name": "HumanEval",
+        "repository": "openai/human-eval",
+        "commit": "6d43fb980f9fee3c892a914eda09951f772ad10d",
+        "path": "data/HumanEval.jsonl.gz",
+        "text_field": "prompt",
+        "tasks": 24
+      },
+      {
+        "family": "terminalbench",
+        "name": "InterCode NL2Bash",
+        "repository": "princeton-nlp/intercode",
+        "commit": "c3e46d827cfc9d4c704ec078f7abf9f41e3191d8",
+        "path": "data/nl2bash/test_queries.json",
+        "text_field": "query",
+        "tasks": 24
+      }
+    ]
+  },
+  "primary_metric": "Router V2 family Hit@1 on the 72-task external holdout",
+  "secondary_metrics": [
+    "legacy frozen-router Hit@1 on the same holdout",
+    "Router V2 minus legacy absolute accuracy delta",
+    "macro family accuracy",
+    "per-family accuracy",
+    "mean Router V2 confidence",
+    "confusion matrix",
+    "5-fold deterministic development cross-validation on General-AgentBench"
+  ],
+  "anti_tuning_rule": "After the first successful scored holdout run, the Router V2 algorithm, family seeds, weighting, temperature, sampling rule, source pins, and prediction mapping must not be changed to improve this holdout score. Any later model must be versioned Router V3 and evaluated on a new holdout.",
+  "evidence_boundary": "This is a balanced three-source family-routing transfer test. It measures task-family routing only, not native GSM8K answer accuracy, HumanEval pass@k, or InterCode environment success."
+}
