@@ -56,16 +56,15 @@ def load_tasks(dataset_root: Path, manifest: dict) -> list[dict]:
                 payload = json.loads(path.read_text())
             except (json.JSONDecodeError, UnicodeDecodeError):
                 continue
-            benchmark = str(payload.get("benchmark") or "").lower()
+            source_benchmark = str(payload.get("benchmark") or "").lower()
             task_id = str(payload.get("task_id") or (payload.get("trace") or {}).get("task_id") or path.stem)
             text = first_user_text(payload)
             if not text:
                 continue
-            # The published benchmark field is ground truth only; prediction never receives it.
-            if benchmark and benchmark != expected_family:
-                raise RuntimeError(
-                    f"Preregistered directory {dirname} contained unexpected benchmark={benchmark!r}"
-                )
+            # General-AgentBench wrapper families can contain an underlying benchmark name
+            # (for example, the `search_*` family contains BrowseComp traces). The family
+            # comes only from the preregistered directory; neither family nor source benchmark
+            # is supplied to RequirementAnalyzer or to predict_family().
             key = (expected_family, task_id)
             if key in seen:
                 continue
@@ -73,6 +72,7 @@ def load_tasks(dataset_root: Path, manifest: dict) -> list[dict]:
             tasks.append(
                 {
                     "family": expected_family,
+                    "source_benchmark": source_benchmark,
                     "task_id": task_id,
                     "text": text,
                     "source_file": str(path.relative_to(dataset_root)),
@@ -114,6 +114,7 @@ def evaluate(tasks: list[dict], manifest: dict) -> dict:
         rows.append(
             {
                 "family": task["family"],
+                "source_benchmark": task["source_benchmark"],
                 "task_id": task["task_id"],
                 "predicted_family": predicted,
                 "correct": correct,
@@ -190,7 +191,7 @@ def write_markdown(payload: dict, path: Path) -> None:
         "",
         payload["evidence_boundary"],
         "",
-        "The benchmark label is withheld until after `RequirementAnalyzer.analyze()` and the preregistered family rule produce a prediction. The workflow fails if `agentweave/` differs from the frozen router commit.",
+        "The family/source labels are withheld until after `RequirementAnalyzer.analyze()` and the preregistered family rule produce a prediction. The workflow fails if `agentweave/` differs from the frozen router commit.",
     ]
     path.write_text("\n".join(lines) + "\n")
 
