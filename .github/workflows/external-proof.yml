@@ -22,6 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       AGENTWEAVE_EXTERNAL_A2A_TARGETS: ${{ secrets.AGENTWEAVE_EXTERNAL_A2A_TARGETS }}
+      AGENTWEAVE_EXTERNAL_RETRIES: '1'
       AGENTWEAVE_PUBLIC_A2A_TARGETS: >-
         [{"name":"Deep Research Archives","agent_card_url":"https://deepresearcharchives.com/.well-known/agent-card.json","implementation":"independently-hosted","rpc_method":"SendMessage","message":{"role":"ROLE_USER","messageId":"agentweave-dra-search","parts":[{"mediaType":"application/json","data":{"skill":"search_public_research","query":"agent interoperability architecture","limit":3}}]}},{"name":"Delx","agent_card_url":"https://api.delx.ai/.well-known/agent-card.json","implementation":"independently-hosted","rpc_method":"message/send","bootstrap":{"method":"agents/register","params":{"agent_id":"agentweave-live-proof-${{ github.run_id }}","agent_name":"AgentWeave Live Proof","source":"a2a"},"capture_headers":{"x-delx-agent-token":["agent_token","token","data.agent_token","data.token","result.agent_token","result.token"]}},"headers":{"x-delx-agent-id":"agentweave-live-proof-${{ github.run_id }}"},"message":{"role":"user","parts":[{"kind":"text","text":"AgentWeave real external A2A interoperability proof"}]},"params":{"agent_id":"agentweave-live-proof-${{ github.run_id }}","mode":"agent","minimal_response":true}}]
     steps:
@@ -34,6 +35,10 @@ jobs:
         run: |
           if [ -z "$AGENTWEAVE_EXTERNAL_A2A_TARGETS" ]; then
             echo "AGENTWEAVE_EXTERNAL_A2A_TARGETS=$AGENTWEAVE_PUBLIC_A2A_TARGETS" >> "$GITHUB_ENV"
+            # The public fallback proves real independently-hosted interoperability.
+            # One public provider outage must not make repository CI red when another
+            # independent provider is live; the artifact still records every target.
+            echo "AGENTWEAVE_EXTERNAL_MIN_SUCCESSES=1" >> "$GITHUB_ENV"
           fi
       - name: Run real external A2A discovery and invocation
         run: python scripts/external_a2a_proof.py
