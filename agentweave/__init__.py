@@ -27,6 +27,7 @@ from .benchmarks import SyntheticAgentFactory, ScalabilityBenchmark, Adversarial
 from .research import ResearchBenchmark, ScaleSuite, EvaluationRow
 from .sdk import AgentWeaveConfig, PluginManager, AgentWeaveSDK
 from .native import NativeAcceleration
+from .recovery import RuntimeRecoveryManager, RecoveryEvent
 from .orchestrator import AgentWeave
 
 __version__ = '0.6.0'
