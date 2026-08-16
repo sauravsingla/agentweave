@@ -1,0 +1,46 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-successful-score",
+  "router_v5_base_commit": "075d1431709a4e4d6c26762a7d832c633050c670",
+  "development_data": {
+    "name": "General-AgentBench published baseline prompts",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "usage": "Router V5 may fit on these development prompts only. No Router V2, V3, or V4 external holdout task is reused for V5 scoring."
+  },
+  "external_holdout": {
+    "name": "VisualWebArena",
+    "repository": "web-arena-x/visualwebarena",
+    "commit": "89f5af29305c3d1e9f97ce4421462060a70c9a03",
+    "family": "terminalbench",
+    "domains": [
+      {
+        "name": "classifieds",
+        "path": "config_files/vwa/test_classifieds.raw.json",
+        "count": 24
+      },
+      {
+        "name": "reddit",
+        "path": "config_files/vwa/test_reddit.raw.json",
+        "count": 24
+      },
+      {
+        "name": "shopping",
+        "path": "config_files/vwa/test_shopping.raw.json",
+        "count": 24
+      }
+    ]
+  },
+  "sampling_rule": "For each VisualWebArena domain, load published task intents, compute SHA256(domain + '\\n' + task_id + '\\n' + intent), sort ascending by digest, and select the first 24. The rule is fixed before the first successful score.",
+  "label_visibility": "The terminalbench family label is attached only after Router V4 and Router V5 predictions are produced.",
+  "primary_metric": "Interactive-family Hit@1 over the balanced 72-task VisualWebArena holdout",
+  "secondary_metrics": [
+    "Router V4 Hit@1 on the identical new holdout",
+    "absolute V5-V4 Hit@1 delta",
+    "per-domain accuracy",
+    "mean confidence",
+    "confusion matrix"
+  ],
+  "anti_tuning_rule": "After the first successful scored run, Router V5 algorithm, weights, source pin, sampling rule, and task counts are frozen for this holdout. Any changed router must become Router V6 with a new holdout.",
+  "evidence_boundary": "This is interactive task-family routing transfer only. It does not claim native VisualWebArena environment success, action execution correctness, or visual grounding performance."
+}
