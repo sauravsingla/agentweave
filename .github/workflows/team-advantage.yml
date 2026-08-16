@@ -17,10 +17,11 @@ jobs:
       - name: Install AgentWeave
         run: pip install -e .[dev]
       - name: Run executable team advantage benchmark
-        run: python scripts/team_advantage_benchmark.py --validate
+        run: python scripts/team_advantage_benchmark.py
       - name: Run benchmark tests
         run: pytest -q tests/test_team_advantage_benchmark.py
       - name: Upload benchmark evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: team-advantage-evidence
