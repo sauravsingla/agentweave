@@ -21,8 +21,9 @@ jobs:
           fetch-depth: 0
 
       - name: Add frozen-router benchmark series to README
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
 
           path = Path('README.md')
@@ -83,6 +84,7 @@ These experiments measure **task-family / specialist routing transfer**, not nat
               text = text.replace(old_para, new_para, 1)
 
           path.write_text(text)
+          PY
 
       - name: Remove one-time updater and commit README
         shell: bash
