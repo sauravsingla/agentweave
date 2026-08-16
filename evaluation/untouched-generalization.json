@@ -1,0 +1,33 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-run",
+  "frozen_router_commit": "06b5381b1521c3db34944ac9ab2b8cb07be438f8",
+  "frozen_scope": "agentweave/",
+  "external_benchmark": {
+    "name": "General-AgentBench",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2"
+  },
+  "task_source": "published baseline trace user prompts only",
+  "canonical_trace_directories": {
+    "mathhay": "mathhay_Claude-Haiku-4.5_distraction_all",
+    "mcpbench": "mcpbench_Claude-Haiku-4.5_distraction_all",
+    "search": "search_Claude-Haiku-4.5_distraction_all",
+    "swebench": "swebench_Claude-Haiku-4.5_distraction_100",
+    "tau2bench": "tau2bench_Claude-Haiku-4.5_distraction_all",
+    "terminalbench": "terminalbench_Claude-Haiku-4.5_distraction_100"
+  },
+  "label_visibility": "benchmark labels are withheld until after requirement analysis and family prediction",
+  "prediction_rule_order": [
+    "mcpbench: mcp or tool-use capability",
+    "terminalbench: operating-system or shell capability",
+    "tau2bench: compliance capability/domain",
+    "swebench: coding, backend, frontend, database, or sql capability",
+    "search: research, retrieval, or knowledge-graph capability",
+    "mathhay: otherwise"
+  ],
+  "primary_metric": "family Hit@1",
+  "secondary_metrics": ["macro family accuracy", "per-family accuracy", "mean analyzer confidence", "confusion matrix"],
+  "anti_tuning_rule": "The benchmark fails if any file under agentweave/ differs from frozen_router_commit. Results must be published without changing the frozen router for this evaluation.",
+  "evidence_boundary": "This is an untouched external family-routing generalization test over published General-AgentBench prompts. It is not the native General-AgentBench end-to-end task score."
+}
