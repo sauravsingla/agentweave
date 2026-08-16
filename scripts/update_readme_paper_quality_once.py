@@ -1,0 +1,74 @@
+from pathlib import Path
+
+path = Path('README.md')
+text = path.read_text()
+
+badge_anchor = '[![Router V7 Holdout](https://github.com/sauravsingla/agentweave/actions/workflows/router-v7-holdout.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/router-v7-holdout.yml)'
+paper_badge = '[![Paper Quality](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml)'
+if paper_badge not in text:
+    if badge_anchor not in text:
+        raise SystemExit('README badge anchor not found')
+    text = text.replace(badge_anchor, badge_anchor + '\n' + paper_badge, 1)
+
+section = '''## Research paper-quality evaluation
+
+AgentWeave now includes a dedicated research-quality evaluation layer that separates **confirmatory controlled outcome evidence** from **exploratory post-hoc routing comparisons**. The research version was frozen at commit `b502fbf803fc906ba4971324efd46bc6cfb91ab7`, and the 30-seed confirmatory outcome hypotheses were committed in [`evaluation/paper-quality-v1.json`](evaluation/paper-quality-v1.json) before that repeated-seed run.
+
+| Paper-quality requirement | Current evidence |
+|---|---|
+| Freeze a version | ✅ Frozen research commit recorded in the protocol |
+| Define hypotheses before testing | ✅ H1–H3 preregistered before the 30-seed confirmatory outcome run |
+| Use untouched test data | ✅ Frozen General-AgentBench and Router V2–V7 holdouts remain untouched evidence; the new embedding comparison on General-AgentBench is explicitly labeled post-hoc |
+| Confidence intervals / significance | ✅ Wilson 95% CIs, paired 10,000-resample bootstrap CIs, exact McNemar tests |
+| Report failure cases | ✅ Failure/disagreement rows and failure/recovery rows are retained in workflow JSON artifacts |
+| Strong semantic/embedding baselines | ✅ MiniLM and BGE-small zero-shot embedding routers |
+| Measure actual outcomes | ✅ Controlled handlers are actually executed and task completion, quality, cost, latency, and recovery are measured |
+
+### Stronger semantic-router comparison
+
+On the already-frozen **499-task General-AgentBench** set, two modern zero-shot embedding baselines substantially outperform the original frozen rule-based AgentWeave router:
+
+| Router | Hit@1 | Wilson 95% CI | Difference vs frozen AgentWeave |
+|---|---:|---:|---:|
+| Frozen AgentWeave | **15.6%** | **[12.7%, 19.1%]** | — |
+| `sentence-transformers/all-MiniLM-L6-v2` | **40.7%** | **[36.5%, 45.0%]** | **+25.1 pp** |
+| `BAAI/bge-small-en-v1.5` | **33.1%** | **[29.1%, 37.3%]** | **+17.4 pp** |
+
+The paired differences are statistically strong: frozen-minus-MiniLM is **-25.1 pp** with bootstrap 95% CI **[-30.3, -19.8] pp** and exact McNemar **p = 7.71e-19**; frozen-minus-BGE-small is **-17.4 pp** with 95% CI **[-22.6, -12.2] pp** and **p = 3.77e-10**. The evidence artifact retains **938 failure/disagreement rows** across the two comparisons.
+
+This result is intentionally not hidden: it shows that the original frozen router is not competitive with simple modern semantic embeddings on this broad taxonomy. It motivates learned/semantic routing while preserving the original untouched result.
+
+**Important scientific boundary:** the embedding-baseline comparison is **exploratory/post-hoc** because General-AgentBench had already been observed before these baselines were added. No General-AgentBench labels or examples are used to fit the zero-shot embedding baselines, but this comparison is not presented as a newly preregistered untouched test.
+
+### Preregistered repeated-seed executable outcome study
+
+The confirmatory controlled outcome study repeats the executable 12-workload benchmark across **30 deterministic seeds**, producing **360 paired observations per strategy**. Handlers actually execute; induced failures raise real exceptions; task completion is based on delivered capabilities rather than routing score alone.
+
+| Strategy | Observations | Completion | Wilson 95% CI | Mean quality | Mean cost | Mean latency | Recovery |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| **AgentWeave optimized team** | **360** | **100.0%** | **[98.9%, 100.0%]** | **0.937** | **0.178** | **39.8 ms** | **100.0%** |
+| Single best agent | 360 | 0.0% | [0.0%, 1.1%] | 0.720 | 0.420 | 115.4 ms | n/a |
+| Random team | 360 | 1.4% | [0.6%, 3.2%] | 0.312 | 0.257 | 53.6 ms | 6.7% |
+| Capability-only team | 360 | 0.0% | [0.0%, 1.1%] | 0.720 | 0.420 | 115.4 ms | n/a |
+
+All three preregistered hypotheses were supported:
+
+- **H1 supported:** AgentWeave task completion exceeds every baseline by at least 20 percentage points.
+- **H2 supported:** AgentWeave mean delivered quality exceeds every baseline by at least 0.10.
+- **H3 supported:** AgentWeave recovery succeeds in at least 90% of exercised failure opportunities.
+
+Paired completion effects were **+100.0 pp** vs single-best, **+98.6 pp** vs random-team, and **+100.0 pp** vs capability-only. Exact McNemar p-values were `8.52e-109`, `2.73e-107`, and `8.52e-109`, respectively. The JSON evidence preserves **75 failure/recovery rows** rather than reporting aggregate success alone.
+
+**Outcome evidence boundary:** these are genuine executed task-completion outcomes inside a controlled benchmark, but the agent catalog, capability proficiencies, execution costs, latency profiles, and induced failures are synthetic. This is stronger than a routing proxy, but it is **not** a production-user, billed-provider, or external benchmark-native task-success claim.
+
+Reproduce or inspect the proof through [`.github/workflows/paper-quality.yml`](.github/workflows/paper-quality.yml), [`scripts/paper_semantic_baselines.py`](scripts/paper_semantic_baselines.py), and [`scripts/paper_outcome_evaluation.py`](scripts/paper_outcome_evaluation.py). The workflow uploads the protocol, full result JSON, Markdown summaries, statistical comparisons, and failure cases as the `paper-quality-evidence` artifact.
+
+'''
+
+if '## Research paper-quality evaluation' not in text:
+    marker = '## Why AgentWeave?'
+    if marker not in text:
+        raise SystemExit('README insertion marker not found')
+    text = text.replace(marker, section + marker, 1)
+
+path.write_text(text)
