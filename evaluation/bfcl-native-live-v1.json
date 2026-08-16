@@ -1,17 +1,17 @@
 {
-  "study_id": "bfcl-native-local-v2-fast",
+  "study_id": "bfcl-native-local-v3-multiple",
   "status": "preregistered-before-first-score",
-  "supersedes_study": "bfcl-native-local-v1",
-  "supersession_reason": "The completed v1 multi_turn_base CPU pilot took roughly 2.5 hours and all three strategies scored 0/12. V2 moves to a new untouched single-turn BFCL category and a new content-blind sample seed; v1 results remain preserved in CI history and are not reinterpreted.",
+  "supersedes_study": "bfcl-native-local-v2-fast",
+  "supersession_reason": "The completed v2 simple_python negative control exposed exactly one tool per task, so all three strategies were effectively identical and each scored 1/12. V3 moves to a new untouched BFCL multiple-function category and a new content-blind sample seed so routing and tool pruning can materially differ. V1 and v2 results remain preserved in CI history and are not reinterpreted.",
   "frozen_agentweave_commit": "a33e793aad02ad5da713957faa77bb82d5673e76",
   "benchmark": {
     "name": "Berkeley Function Calling Leaderboard V4",
     "repository": "ShishirPatil/gorilla",
     "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
-    "category": "simple_python",
+    "category": "multiple",
     "native_metric": "BFCL single-turn AST/function-call validity",
     "sample_size": 12,
-    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-native-v2-fast:' + id) digest from BFCL_v4_simple_python.json. No task-content filtering is permitted."
+    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-native-v3-multiple:' + id) digest from BFCL_v4_multiple.json. No task-content filtering is permitted."
   },
   "inference": {
     "mode": "self-hosted CPU",
@@ -42,11 +42,11 @@
   },
   "measurements": ["BFCL native per-task success", "local wall-clock model latency", "input/output tokens", "external API spend ($0)", "tools exposed per request", "all BFCL failure/error records"],
   "anti_tuning_rules": [
-    "The prior v1 scored results are preserved and are not used to select v2 task contents.",
-    "V2 benchmark commit, category, sample ids/rule, model, router hyperparameters, hypotheses, and generation settings do not change after the first v2 scored run.",
+    "The prior v1 and v2 scored results are preserved and are not used to select v3 task contents.",
+    "V3 benchmark commit, category, sample ids/rule, model, router hyperparameters, hypotheses, and generation settings do not change after the first v3 scored run.",
     "Any post-score modification requires a new study id and untouched sample.",
     "All failures remain in the evidence artifact.",
     "All three strategies use exactly the same sampled tasks and local model."
   ],
-  "evidence_boundary": "This is a fast benchmark-native BFCL V4 single-turn pilot using an automatically downloaded open model with no API key. It measures real local inference latency and tokens and has $0 external API spend. It is not a full BFCL leaderboard score, not a multi-turn result, and not a production-provider cost study."
+  "evidence_boundary": "This is a fast benchmark-native BFCL V4 single-turn multiple-function pilot using an automatically downloaded open model with no API key. It measures real local inference latency and tokens and has $0 external API spend. It is not a full BFCL leaderboard score, not a multi-turn result, and not a production-provider cost study."
 }
