@@ -14,6 +14,8 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 [![ToolBench](https://github.com/sauravsingla/agentweave/actions/workflows/toolbench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/toolbench-external.yml)
 [![AgencyBench](https://github.com/sauravsingla/agentweave/actions/workflows/agencybench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/agencybench-external.yml)
 [![AgentProcessBench](https://github.com/sauravsingla/agentweave/actions/workflows/agentprocessbench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/agentprocessbench-external.yml)
+[![Untouched Generalization](https://github.com/sauravsingla/agentweave/actions/workflows/untouched-generalization.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/untouched-generalization.yml)
+[![Router V7 Holdout](https://github.com/sauravsingla/agentweave/actions/workflows/router-v7-holdout.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/router-v7-holdout.yml)
 
 > **A2A answers:** how can agents communicate?
 >
@@ -35,6 +37,37 @@ AgentWeave is evaluated across four independent public benchmark distributions �
 The AgentBench, ToolBench, and AgencyBench figures are **routing/selection metrics**. The AgentProcessBench figures are a **deterministic label-blind process-quality baseline** over published trajectories. None of these numbers is presented as a replacement for the original benchmarks' end-to-end task-success or official LLM-judge scores.
 
 The next research step is to connect selection and process verification in one benchmark-native loop: **task → candidate discovery → capability/trust ranking → selected agent/tool/team → execution → process verification/native judge → outcome-driven reputation update**.
+
+## Frozen-router generalization and external holdouts
+
+To test whether routing improvements transfer beyond datasets already inspected during development, AgentWeave maintains a **frozen-router evaluation sequence**. Each router version is scored once on a newly preregistered external holdout; after the first successful scored run, that router/holdout pair is frozen. A later improvement must use a new router version and a new holdout rather than tuning against the prior test set.
+
+| Evaluation | New untouched holdout | Tasks | Same-holdout comparison | Result |
+|---|---|---:|---|---:|
+| **Frozen original router** | General-AgentBench | **499** | Frozen router vs majority baseline | **15.6% Hit@1**, 20.8% macro; majority baseline 39.9% |
+| **Router V2** | GSM8K + HumanEval + InterCode NL2Bash | **72** | Frozen router 52.8% → V2 | **54.2% Hit@1 (+1.4 pp)** |
+| **Router V3** | MBPP + TruthfulQA + OSWorld | **72** | V2 31.9% → V3 | **76.4% Hit@1 (+44.4 pp)** |
+| **Router V4** | CRUXEval + BrowserGym MiniWoB + WorkArena | **72** | V3 72.2% → V4 | **91.7% Hit@1 (+19.4 pp)** |
+| **Router V5** | VisualWebArena | **72** | V4 38.9% → V5 | **77.8% interactive Hit@1 (+38.9 pp)** |
+| **Router V6** | WebArena | **72** | V5 37.5% → V6 | **59.7% interactive Hit@1 (+22.2 pp)** |
+| **Router V7** | AssistantBench | **72** | V6 73.6% → V7 | **91.7% search-family Hit@1 (+18.1 pp)** |
+
+**Important comparison rule:** each row after the first uses a **different external holdout**. Therefore V2's 54.2%, V3's 76.4%, V4's 91.7%, V5's 77.8%, V6's 59.7%, and V7's 91.7% are **not a single cross-version leaderboard and must not be compared directly across rows**. The scientifically valid improvement is the within-row comparison between the previous router and the new router on the **same newly introduced holdout**.
+
+The original General-AgentBench result is intentionally retained even though it is weak: the frozen router achieved **15.6% overall Hit@1**, showing poor broad-taxonomy transfer before the later research routers were developed. Router V2–V7 are kept under `research/` as separate experimental routers rather than silently changing that original result.
+
+### Reproducibility and anti-tuning controls
+
+- General-AgentBench development prompts remain pinned for the research-router development path.
+- Each external holdout pins its source repository/dataset revision, task count, and deterministic sampling rule before scoring.
+- Holdout family labels are attached only after predictions are produced where the protocol requires label-blind scoring.
+- Every router version has a dedicated evaluation protocol under [`evaluation/`](evaluation/) and a GitHub Actions proof under [`.github/workflows/`](.github/workflows/).
+- The frozen original proof is executed by [`untouched-generalization.yml`](.github/workflows/untouched-generalization.yml); subsequent proofs are executed by `router-v2-holdout.yml` through `router-v7-holdout.yml`.
+- Poor or incomplete transfer results are preserved rather than overwritten; tuning against a scored holdout requires a new router version and a new test distribution.
+
+### Generalization evidence boundary
+
+These experiments measure **task-family / specialist routing transfer**, not native benchmark task completion. They do **not** claim GSM8K mathematical answer accuracy, HumanEval/MBPP code pass rates, OSWorld/WorkArena/WebArena browser-environment success, VisualWebArena visual grounding success, AssistantBench answer quality, production-user accuracy, provider latency, or billed model cost. The benchmark tasks are external and published; the reported metric is the router's ability to identify the intended capability family before the held-out label is used for scoring.
 
 ## Why AgentWeave?
 
@@ -543,12 +576,12 @@ A passing proof is evidence for the configured test runtime; it is not a formal 
 | Category | Status | Current use |
 |---|---|---|
 | **Real systems / real execution** | ✅ | public A2A services, upstream SDK agents, official TCK, PostgreSQL, Docker/runtime controls, and executable team-advantage workload handlers |
-| **External public benchmark data** | ✅ | 490 AgentBench tasks, 1,100 ToolBench queries with 4,856 API records, 128 parsed AgencyBench V2 subtasks, and 1,000 AgentProcessBench trajectories with 8,509 human-labeled assistant steps |
+| **External public benchmark data** | ✅ | AgentBench, ToolBench, AgencyBench, AgentProcessBench, General-AgentBench, GSM8K, HumanEval, InterCode NL2Bash, MBPP, TruthfulQA, OSWorld, CRUXEval, BrowserGym MiniWoB, WorkArena, VisualWebArena, WebArena, and AssistantBench holdouts |
 | **Synthetic benchmark data** | ✅ | generated populations, capabilities, trust, latency/cost, adversarial fixtures, AgentBench candidate-agent catalog, controlled ToolBench priors, fixed AgencyBench zero-shot capability-family metadata, and the controlled team-advantage agent catalog/failure plan |
 | **Supervised benchmark routing data** | ✅ | AgencyBench development/other-fold scenario labels used only to train the separately reported held-out and cross-validation routing analyses |
 | **Production / real-world agent traces** | ❌ not claimed | no private production-user corpus, billed cost traces, or human-rated production outcomes |
 
-The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, and AgentProcessBench provide external published benchmark data, while some candidate/catalog priors remain controlled synthetic or fixed metadata. The team-advantage benchmark performs real executable handler invocation over a controlled synthetic agent catalog with injected failures. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels are withheld during prediction and used only afterward for scoring.
+The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, AgentProcessBench, and the frozen-router V2–V7 holdouts provide external published benchmark data, while some candidate/catalog priors remain controlled synthetic or fixed metadata. The team-advantage benchmark performs real executable handler invocation over a controlled synthetic agent catalog with injected failures. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels and frozen-router holdout family labels are withheld during prediction where specified and used only afterward for scoring.
 
 ## Getting started
 
