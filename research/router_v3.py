@@ -9,8 +9,8 @@ from research.router_v2 import FAMILIES, PrototypeFamilyRouterV2, RouterPredicti
 
 
 # Benchmark-independent task-intent anchors. These are fixed before the first
-# Router V3 holdout score and intentionally describe broad capabilities rather
-# than benchmark names or task instances.
+# successful Router V3 holdout score and intentionally describe broad
+# capabilities rather than benchmark names or task instances.
 SEMANTIC_ANCHORS = {
     "mathhay": (
         "solve calculate compute mathematics arithmetic algebra geometry probability "
@@ -57,9 +57,9 @@ class SemanticFamilyRouterV3(PrototypeFamilyRouterV2):
     """Deterministic Router V3 for cross-distribution family transfer.
 
     V3 retains V2's development-trained TF-IDF prototype centroids, but adds a
-    second benchmark-independent semantic-anchor representation plus small
-    structural intent bonuses. It uses no external model and no holdout label
-    at prediction time.
+    second benchmark-independent semantic-anchor representation plus structural
+    intent bonuses. It uses no external model and no holdout label at prediction
+    time.
     """
 
     def __init__(
@@ -67,7 +67,7 @@ class SemanticFamilyRouterV3(PrototypeFamilyRouterV2):
         *,
         legacy_bonus: float = 0.08,
         anchor_weight: float = 0.34,
-        structural_bonus: float = 0.22,
+        structural_bonus: float = 0.36,
         temperature: float = 0.17,
     ):
         super().__init__(legacy_bonus=legacy_bonus, temperature=temperature)
@@ -86,18 +86,19 @@ class SemanticFamilyRouterV3(PrototypeFamilyRouterV2):
     def _intent_bonuses(self, text: str) -> Counter[str]:
         bonus: Counter[str] = Counter()
         normalized = text.strip()
-        if _CODE_RE.search(normalized):
+        is_code = bool(_CODE_RE.search(normalized))
+        if is_code:
             bonus["swebench"] += self.structural_bonus
-        if _QUESTION_RE.search(normalized) and not _CODE_RE.search(normalized):
-            bonus["search"] += self.structural_bonus * 0.72
-        if _OS_RE.search(normalized) and not _CODE_RE.search(normalized):
-            bonus["terminalbench"] += self.structural_bonus * 0.72
+        if _QUESTION_RE.search(normalized) and not is_code:
+            bonus["search"] += self.structural_bonus * 0.95
+        if _OS_RE.search(normalized) and not is_code:
+            bonus["terminalbench"] += self.structural_bonus * 0.95
         if _TOOL_RE.search(normalized):
-            bonus["mcpbench"] += self.structural_bonus * 0.55
+            bonus["mcpbench"] += self.structural_bonus * 0.65
         if _POLICY_RE.search(normalized):
-            bonus["tau2bench"] += self.structural_bonus * 0.65
-        if _MATH_RE.search(normalized) and not _CODE_RE.search(normalized):
-            bonus["mathhay"] += self.structural_bonus * 0.45
+            bonus["tau2bench"] += self.structural_bonus * 0.70
+        if _MATH_RE.search(normalized) and not is_code:
+            bonus["mathhay"] += self.structural_bonus * 0.55
         return bonus
 
     def predict(self, text: str) -> RouterPrediction:
