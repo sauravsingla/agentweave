@@ -1,0 +1,88 @@
+name: Router V3 External Holdout
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  router-v3-transfer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install AgentWeave
+        run: pip install -e .[dev]
+      - name: Verify Router V3 tests
+        run: pytest -q tests/test_router_v3.py tests/test_router_v2.py tests/test_untouched_generalization.py
+
+      - name: Fetch pinned General-AgentBench development prompts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cxcscmu/General-AgentBench.git external-general-agentbench
+          cd external-general-agentbench
+          git sparse-checkout init --cone
+          git sparse-checkout set \
+            general_agent/traces/baseline/mathhay_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/mcpbench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/search_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/swebench_Claude-Haiku-4.5_distraction_100 \
+            general_agent/traces/baseline/tau2bench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/terminalbench_Claude-Haiku-4.5_distraction_100
+          git checkout 35f5c027c31ddcb3366b28674c6cb2957460c0e2
+          test "$(git rev-parse HEAD)" = "35f5c027c31ddcb3366b28674c6cb2957460c0e2"
+
+      - name: Fetch preregistered Router V3 holdout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external-v3
+
+          git clone --filter=blob:none --no-checkout https://github.com/google-research/google-research.git external-v3/google-research
+          cd external-v3/google-research
+          git sparse-checkout init --cone
+          git sparse-checkout set mbpp
+          git checkout 589e977488f21a336a3d3da9b96da91ddbcf935e
+          test "$(git rev-parse HEAD)" = "589e977488f21a336a3d3da9b96da91ddbcf935e"
+          cd ../..
+
+          git clone --filter=blob:none --no-checkout https://github.com/sylinrl/TruthfulQA.git external-v3/truthfulqa
+          cd external-v3/truthfulqa
+          git sparse-checkout init --cone
+          git sparse-checkout set TruthfulQA.csv
+          git checkout d71c110897f5d31c5d7f309e7bc316c152f6f031
+          test "$(git rev-parse HEAD)" = "d71c110897f5d31c5d7f309e7bc316c152f6f031"
+          cd ../..
+
+          git clone --filter=blob:none --no-checkout https://github.com/xlang-ai/OSWorld.git external-v3/osworld
+          cd external-v3/osworld
+          git sparse-checkout init --cone
+          git sparse-checkout set evaluation_examples/examples
+          git checkout 091f5ef1d5544bc74953c77875d5feb5bed30108
+          test "$(git rev-parse HEAD)" = "091f5ef1d5544bc74953c77875d5feb5bed30108"
+          cd ../..
+
+      - name: Run Router V3 new holdout once
+        run: |
+          python scripts/router_v3_holdout.py \
+            --development-root external-general-agentbench/general_agent/traces/baseline \
+            --external-root external-v3
+
+      - name: Upload Router V3 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: router-v3-external-holdout-evidence
+          path: |
+            router-v3-holdout-results.json
+            router-v3-holdout-results.md
+            evaluation/router-v3-holdout.json
