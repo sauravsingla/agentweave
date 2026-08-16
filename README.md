@@ -9,6 +9,7 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 [![A2A SDK Interop](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml)
 [![Protocol Depth](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/protocol-depth.yml)
 [![External Proof](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/external-proof.yml)
+[![Team Advantage](https://github.com/sauravsingla/agentweave/actions/workflows/team-advantage.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/team-advantage.yml)
 [![AgentBench](https://github.com/sauravsingla/agentweave/actions/workflows/agentbench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/agentbench-external.yml)
 [![ToolBench](https://github.com/sauravsingla/agentweave/actions/workflows/toolbench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/toolbench-external.yml)
 [![AgencyBench](https://github.com/sauravsingla/agentweave/actions/workflows/agencybench-external.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/agencybench-external.yml)
@@ -496,6 +497,34 @@ The internal publication package remains a reproducible **synthetic routing/team
 
 `quality_proxy` is a routing metric, not factual correctness or human preference. AgentWeave currently improves latency/cost/trust against several baselines while the quality proxy remains slightly below single-best.
 
+## Executable multi-agent team advantage benchmark
+
+AgentWeave also includes a controlled **executable workload benchmark** designed to test whether optimized multi-agent team formation provides an advantage over simpler selection policies on the same tasks and agent catalog. Unlike the synthetic routing table above, the benchmark actually invokes handlers, measures wall-clock execution latency, accumulates invocation cost from execution profiles, injects runtime failures, and scores quality from the capabilities delivered by executed agents.
+
+The benchmark compares four strategies across **12 multi-capability workloads**, including **4 induced primary-specialist failures**:
+
+| Strategy | Task completion | Mean quality | Mean cost | Mean latency | P95 latency | Recovery success |
+|---|---:|---:|---:|---:|---:|---:|
+| **AgentWeave optimized team** | **100.0%** | **0.937** | **0.178** | **39.7 ms** | **73.8 ms** | **100.0%** |
+| Single best agent | 0.0% | 0.720 | 0.420 | 115.4 ms | 115.4 ms | n/a |
+| Random team | 0.0% | 0.160 | 0.200 | 40.7 ms | 72.6 ms | 0.0% |
+| Capability-only team | 0.0% | 0.720 | 0.420 | 115.4 ms | 115.4 ms | n/a |
+
+The AgentWeave strategy uses `AgentMatcher` plus `GlobalTeamOptimizer`; after a selected agent fails, trust is updated before the remaining candidates are re-ranked for replacement. The single-best baseline uses the top AgentWeave-ranked candidate, the random baseline uses deterministic seeded sampling, and the capability-only baseline greedily maximizes uncovered capabilities/proficiency while ignoring trust, cost, and latency. All strategies receive up to two replacement attempts so recovery is compared rather than withheld from the baselines.
+
+The benchmark also produced a regression hardening change in `GlobalTeamOptimizer`: team candidates must contribute at least one required capability, preventing task-irrelevant agents from entering a team purely because trust, placement, or diversity terms make their overall objective positive.
+
+Reproduce the benchmark locally with:
+
+```bash
+python scripts/team_advantage_benchmark.py
+pytest -q tests/test_team_advantage_benchmark.py
+```
+
+CI runs the same proof in [`.github/workflows/team-advantage.yml`](.github/workflows/team-advantage.yml) and uploads `team-advantage-results.json` and `team-advantage-results.md` as workflow artifacts.
+
+**Evidence boundary:** these are controlled executable-workload results with a synthetic agent catalog and deliberately injected failures. They demonstrate actual execution, measured latency/cost, failure handling, team selection, and recovery under the benchmark configuration, but they are **not** presented as an external production-user, billed-provider, or independent real-world workload benchmark.
+
 ## Security, identity, governance, storage, and reliability
 
 The proof suite covers:
@@ -513,13 +542,13 @@ A passing proof is evidence for the configured test runtime; it is not a formal 
 
 | Category | Status | Current use |
 |---|---|---|
-| **Real systems / real execution** | ✅ | public A2A services, upstream SDK agents, official TCK, PostgreSQL, Docker/runtime controls |
+| **Real systems / real execution** | ✅ | public A2A services, upstream SDK agents, official TCK, PostgreSQL, Docker/runtime controls, and executable team-advantage workload handlers |
 | **External public benchmark data** | ✅ | 490 AgentBench tasks, 1,100 ToolBench queries with 4,856 API records, 128 parsed AgencyBench V2 subtasks, and 1,000 AgentProcessBench trajectories with 8,509 human-labeled assistant steps |
-| **Synthetic benchmark data** | ✅ | generated populations, capabilities, trust, latency/cost, adversarial fixtures, AgentBench candidate-agent catalog, controlled ToolBench priors, and fixed AgencyBench zero-shot capability-family metadata |
+| **Synthetic benchmark data** | ✅ | generated populations, capabilities, trust, latency/cost, adversarial fixtures, AgentBench candidate-agent catalog, controlled ToolBench priors, fixed AgencyBench zero-shot capability-family metadata, and the controlled team-advantage agent catalog/failure plan |
 | **Supervised benchmark routing data** | ✅ | AgencyBench development/other-fold scenario labels used only to train the separately reported held-out and cross-validation routing analyses |
 | **Production / real-world agent traces** | ❌ not claimed | no private production-user corpus, billed cost traces, or human-rated production outcomes |
 
-The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, and AgentProcessBench provide external published benchmark data, while some candidate/catalog priors remain controlled synthetic or fixed metadata. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels are withheld during prediction and used only afterward for scoring.
+The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, and AgentProcessBench provide external published benchmark data, while some candidate/catalog priors remain controlled synthetic or fixed metadata. The team-advantage benchmark performs real executable handler invocation over a controlled synthetic agent catalog with injected failures. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels are withheld during prediction and used only afterward for scoring.
 
 ## Getting started
 
