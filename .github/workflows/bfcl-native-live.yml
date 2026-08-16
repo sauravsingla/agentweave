@@ -1,4 +1,4 @@
-name: BFCL Native Fast Local Study
+name: BFCL Keyless Studies
 
 on:
   pull_request:
@@ -52,3 +52,60 @@ jobs:
         with:
           name: bfcl-native-local-evidence
           path: bfcl-native-live-results/
+
+  bfcl-public-openfunctions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install keyless endpoint study dependencies
+        run: |
+          pip install -e .
+          pip install 'bfcl-eval==2025.12.17' 'sentence-transformers>=5.1,<6'
+      - name: Fetch pinned BFCL source
+        run: |
+          git clone --filter=blob:none https://github.com/ShishirPatil/gorilla.git external-gorilla
+          cd external-gorilla
+          git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
+          test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
+      - name: Verify untouched public-endpoint sample
+        run: |
+          python scripts/bfcl_public_openfunctions_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-public-openfunctions-results \
+            --validate-only
+      - name: Smoke-test Berkeley OpenFunctions endpoint
+        run: |
+          python - <<'PY'
+          import requests
+          url = 'http://luigi.millennium.berkeley.edu:8000/v1/chat/completions'
+          payload = {
+              'model': 'gorilla-openfunctions-v2',
+              'messages': [{'role': 'user', 'content': 'What is the weather in Paris?'}],
+              'functions': [{
+                  'name': 'get_weather',
+                  'description': 'Get weather for a city',
+                  'parameters': {'type': 'object', 'properties': {'city': {'type': 'string'}}, 'required': ['city']},
+              }],
+          }
+          response = requests.post(url, json=payload, timeout=30)
+          print('status=', response.status_code)
+          print(response.text[:2000])
+          response.raise_for_status()
+          PY
+      - name: Run keyless public OpenFunctions BFCL study
+        run: |
+          python scripts/bfcl_public_openfunctions_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-public-openfunctions-results
+      - name: Upload public OpenFunctions evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfcl-public-openfunctions-evidence
+          path: bfcl-public-openfunctions-results/
