@@ -1,4 +1,18 @@
-from scripts.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+
+MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "paper_stats.py"
+SPEC = importlib.util.spec_from_file_location("paper_stats", MODULE_PATH)
+assert SPEC and SPEC.loader
+paper_stats = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(paper_stats)
+
+exact_mcnemar_pvalue = paper_stats.exact_mcnemar_pvalue
+paired_bootstrap_difference = paper_stats.paired_bootstrap_difference
+wilson_interval = paper_stats.wilson_interval
 
 
 def test_wilson_interval_contains_observed_rate():
