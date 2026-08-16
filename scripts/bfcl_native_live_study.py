@@ -3,7 +3,11 @@ from __future__ import annotations
 import argparse, hashlib, json, math, os, random, statistics, subprocess, sys, time
 from pathlib import Path
 
-BFCL_HANDLER_MODEL_ID = "gpt-4.1-mini-2025-04-14-FC"
+# BFCL compatibility transport only. This registry entry uses BFCL's
+# OpenAICompletionsHandler so the benchmark sends the actual multi-turn
+# `messages` and `tools` to our local routing proxy. The proxy always
+# overwrites the model with LOCAL_MODEL_ID; MiniCPM-SALA is never executed.
+BFCL_HANDLER_MODEL_ID = "openbmb/MiniCPM-SALA-FC"
 LOCAL_MODEL_ID = "MadeAgents/Hammer2.1-0.5b"
 CATEGORY = "multi_turn_base"
 SAMPLE_SEED = "agentweave-bfcl-native-v1:"
@@ -69,7 +73,7 @@ def main():
     protocol=json.loads(args.protocol.read_text());assert protocol["benchmark"]["commit"]=="6ea57973c7a6097fd7c5915698c54c17c5b1b6c8";assert protocol["benchmark"]["sample_size"]==12;assert protocol["inference"]["model"]==LOCAL_MODEL_ID;assert protocol["status"]=="preregistered-before-first-score"
     data=args.bfcl_root/"bfcl_eval"/"data"/"BFCL_v4_multi_turn_base.json";ids=select_ids(data,12);args.output.mkdir(parents=True,exist_ok=True);(args.output/"sampled_ids.json").write_text(json.dumps(ids,indent=2))
     if args.validate_only:
-        print(json.dumps({"protocol_valid":True,"sample_count":len(ids),"sample_sha256":hashlib.sha256("\n".join(ids).encode()).hexdigest(),"local_model":LOCAL_MODEL_ID},indent=2));return
+        print(json.dumps({"protocol_valid":True,"sample_count":len(ids),"sample_sha256":hashlib.sha256("\n".join(ids).encode()).hexdigest(),"local_model":LOCAL_MODEL_ID,"bfcl_transport_model":BFCL_HANDLER_MODEL_ID},indent=2));return
     model_server=subprocess.Popen([sys.executable,str((Path(__file__).parent/"bfcl_local_hammer_server.py").resolve()),"--port","9100"])
     try:
         wait_http("http://127.0.0.1:9100/v1/models",600)
@@ -86,6 +90,6 @@ def main():
     for b in ("single-agent","semantic-router"):
         a=[float(score_maps["agentweave"][i]) for i in ids];bb=[float(score_maps[b][i]) for i in ids];comparisons[b]={"agentweave_minus_baseline_pp":100*(statistics.fmean(a)-statistics.fmean(bb)),"paired_bootstrap_95_ci_pp":[100*x for x in paired_bootstrap(a,bb)],"exact_mcnemar_p":exact_mcnemar([bool(x) for x in a],[bool(x) for x in bb])}
     failures=[{"id":i,"strategy":s} for i in ids for s in STRATEGIES if not score_maps[s][i]]
-    payload={"study_id":protocol["study_id"],"benchmark_commit":protocol["benchmark"]["commit"],"model":LOCAL_MODEL_ID,"sampled_ids":ids,"results":results,"comparisons":comparisons,"failure_index":failures,"evidence_boundary":protocol["evidence_boundary"]}
+    payload={"study_id":protocol["study_id"],"benchmark_commit":protocol["benchmark"]["commit"],"model":LOCAL_MODEL_ID,"bfcl_transport_model":BFCL_HANDLER_MODEL_ID,"sampled_ids":ids,"results":results,"comparisons":comparisons,"failure_index":failures,"evidence_boundary":protocol["evidence_boundary"]}
     (args.output/"summary.json").write_text(json.dumps(payload,indent=2,sort_keys=True));print(json.dumps(payload,indent=2,sort_keys=True))
 if __name__=="__main__":main()
