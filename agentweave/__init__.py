@@ -28,7 +28,9 @@ from .research import ResearchBenchmark, ScaleSuite, EvaluationRow
 from .sdk import AgentWeaveConfig, PluginManager, AgentWeaveSDK
 from .native import NativeAcceleration
 from .recovery import RuntimeRecoveryManager, RecoveryEvent
+from .workflow import WorkflowStep, WorkflowCheckpoint, DurableWorkflowEngine
 from .orchestrator import AgentWeave
+from .durable import DurableAgentWeave
 
 __version__ = '0.6.0'
 __all__=[name for name in globals() if not name.startswith('_')]
