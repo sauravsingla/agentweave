@@ -1,0 +1,67 @@
+name: Paper Quality Evaluation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  paper-quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install AgentWeave and semantic baseline dependencies
+        run: |
+          pip install -e .[dev]
+          pip install 'sentence-transformers>=5.1,<6'
+
+      - name: Verify statistical utilities
+        run: pytest -q tests/test_paper_stats.py tests/test_team_advantage_benchmark.py tests/test_untouched_generalization.py
+
+      - name: Fetch pinned General-AgentBench untouched set
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cxcscmu/General-AgentBench.git external-general-agentbench
+          cd external-general-agentbench
+          git sparse-checkout init --cone
+          git sparse-checkout set \
+            general_agent/traces/baseline/mathhay_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/mcpbench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/search_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/swebench_Claude-Haiku-4.5_distraction_100 \
+            general_agent/traces/baseline/tau2bench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/terminalbench_Claude-Haiku-4.5_distraction_100
+          git checkout 35f5c027c31ddcb3366b28674c6cb2957460c0e2
+          test "$(git rev-parse HEAD)" = "35f5c027c31ddcb3366b28674c6cb2957460c0e2"
+          cd ..
+
+      - name: Compare frozen router with semantic embedding baselines
+        run: |
+          python scripts/paper_semantic_baselines.py \
+            --dataset-root external-general-agentbench/general_agent/traces/baseline
+
+      - name: Run preregistered repeated-seed outcome evaluation
+        run: python scripts/paper_outcome_evaluation.py --seeds 30
+
+      - name: Upload paper-quality evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-quality-evidence
+          path: |
+            evaluation/paper-quality-v1.json
+            paper-semantic-baselines.json
+            paper-semantic-baselines.md
+            paper-outcome-results.json
+            paper-outcome-results.md
