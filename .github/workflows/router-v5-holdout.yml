@@ -1,0 +1,71 @@
+name: Router V5 External Holdout
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  router-v5-transfer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install AgentWeave
+        run: pip install -e .[dev]
+      - name: Verify Router V5 tests
+        run: pytest -q tests/test_router_v5.py tests/test_router_v4.py tests/test_router_v3.py tests/test_router_v2.py tests/test_untouched_generalization.py
+
+      - name: Fetch pinned General-AgentBench development prompts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cxcscmu/General-AgentBench.git external-general-agentbench
+          cd external-general-agentbench
+          git sparse-checkout init --cone
+          git sparse-checkout set \
+            general_agent/traces/baseline/mathhay_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/mcpbench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/search_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/swebench_Claude-Haiku-4.5_distraction_100 \
+            general_agent/traces/baseline/tau2bench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/terminalbench_Claude-Haiku-4.5_distraction_100
+          git checkout 35f5c027c31ddcb3366b28674c6cb2957460c0e2
+          test "$(git rev-parse HEAD)" = "35f5c027c31ddcb3366b28674c6cb2957460c0e2"
+
+      - name: Fetch preregistered Router V5 holdout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external-v5
+          git clone --filter=blob:none --no-checkout https://github.com/web-arena-x/visualwebarena.git external-v5/visualwebarena
+          cd external-v5/visualwebarena
+          git sparse-checkout init --cone
+          git sparse-checkout set config_files/vwa
+          git checkout 89f5af29305c3d1e9f97ce4421462060a70c9a03
+          test "$(git rev-parse HEAD)" = "89f5af29305c3d1e9f97ce4421462060a70c9a03"
+          cd ../..
+
+      - name: Run Router V5 new holdout once
+        run: |
+          python scripts/router_v5_holdout.py \
+            --development-root external-general-agentbench/general_agent/traces/baseline \
+            --external-root external-v5
+
+      - name: Upload Router V5 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: router-v5-external-holdout-evidence
+          path: |
+            router-v5-holdout-results.json
+            router-v5-holdout-results.md
+            evaluation/router-v5-holdout.json
