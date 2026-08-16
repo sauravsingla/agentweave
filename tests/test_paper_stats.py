@@ -1,4 +1,4 @@
-from research.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
+from scripts.paper_stats import exact_mcnemar_pvalue, paired_bootstrap_difference, wilson_interval
 
 
 def test_wilson_interval_contains_observed_rate():
