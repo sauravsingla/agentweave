@@ -1,6 +1,17 @@
 import asyncio
+import importlib.util
+import sys
+from pathlib import Path
 
-from scripts.team_advantage_benchmark import run_benchmark, validate_evidence
+
+SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'team_advantage_benchmark.py'
+SPEC = importlib.util.spec_from_file_location('agentweave_team_advantage_benchmark', SCRIPT)
+assert SPEC and SPEC.loader
+MODULE = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = MODULE
+SPEC.loader.exec_module(MODULE)
+run_benchmark = MODULE.run_benchmark
+validate_evidence = MODULE.validate_evidence
 
 
 def test_team_advantage_benchmark_demonstrates_completion_quality_and_recovery():
