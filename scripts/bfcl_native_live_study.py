@@ -31,17 +31,26 @@ def paired_bootstrap(a,b,seed=20260817,reps=10000):
     v.sort();return v[int(.025*(reps-1))],v[int(.975*(reps-1))]
 def read_score_rows(score_dir,sampled_ids):
     files=sorted(dict.fromkeys(list(Path(score_dir).rglob(f"*{CATEGORY}*score*.json"))+list(Path(score_dir).rglob(f"*{CATEGORY}*.json"))))
-    rows=[]
     for f in files:
-        try:c=load_jsonl(f)
-        except Exception:continue
-        if c and any("valid" in r for r in c):rows=c;break
-    if not rows:raise RuntimeError(f"No BFCL per-task valid records for {CATEGORY}")
-    out={str(r["id"]):bool(r.get("valid")) for r in rows if r.get("id") is not None}
-    if not out and len(rows)==len(sampled_ids):out={i:bool(r.get("valid")) for i,r in zip(sampled_ids,rows)}
-    missing=set(sampled_ids)-set(out)
-    if missing:raise RuntimeError(f"Missing sampled ids: {sorted(missing)}")
-    return {i:out[i] for i in sampled_ids}
+        try: rows=load_jsonl(f)
+        except Exception: continue
+        if not rows: continue
+        summary=next((r for r in rows if "correct_count" in r and "total_count" in r),None)
+        detailed=[r for r in rows if r.get("id") is not None and "valid" in r]
+        if not detailed and not summary: continue
+        out={str(r["id"]):bool(r.get("valid")) for r in detailed}
+        missing=set(sampled_ids)-set(out)
+        if missing and summary:
+            total=int(summary["total_count"]);correct=int(summary["correct_count"]);known_valid=sum(1 for i,v in out.items() if i in sampled_ids and v)
+            # BFCL partial-eval score files can omit successful examples while
+            # retaining failed examples. Infer omitted examples as valid only
+            # when the aggregate counts make that conclusion exact.
+            if total==len(sampled_ids) and correct-known_valid==len(missing):
+                out.update({i:True for i in missing});missing=set()
+        if not out and len(detailed)==len(sampled_ids):out={i:bool(r.get("valid")) for i,r in zip(sampled_ids,detailed)}
+        if missing:raise RuntimeError(f"Missing sampled ids: {sorted(missing)}")
+        if set(sampled_ids)<=set(out):return {i:out[i] for i in sampled_ids}
+    raise RuntimeError(f"No BFCL per-task valid records for {CATEGORY}")
 def summarize_metrics(path):
     rows=load_jsonl(path) if Path(path).exists() else []
     return {"model_calls":len(rows),"mean_call_latency_seconds":statistics.fmean(r["latency_seconds"] for r in rows) if rows else 0.,"median_call_latency_seconds":statistics.median(r["latency_seconds"] for r in rows) if rows else 0.,"input_tokens":sum(int(r.get("input_tokens",0)) for r in rows),"output_tokens":sum(int(r.get("output_tokens",0)) for r in rows),"external_api_spend_usd":0.0,"mean_tools_before":statistics.fmean(r["tools_before"] for r in rows) if rows else 0.,"mean_tools_after":statistics.fmean(r["tools_after"] for r in rows) if rows else 0.,"errors":[r for r in rows if r.get("error")]}
