@@ -1,0 +1,35 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-successful-score",
+  "router_v7_base_commit": "c8dc39f1d78a12e92a2e18a2ecd8dd059edbdb0d",
+  "development_data": {
+    "name": "General-AgentBench published baseline prompts",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "usage": "Router V7 may fit on these development prompts only. No Router V2-V6 external holdout task is reused for V7 scoring."
+  },
+  "external_holdout": {
+    "name": "AssistantBench",
+    "repository": "AssistantBench/AssistantBench",
+    "host": "Hugging Face Datasets",
+    "commit": "482cbbc0400f6d048438c4021727f21a10cbff49",
+    "files": [
+      "assistant_bench_v1.0_dev.jsonl",
+      "assistant_bench_v1.0_test.jsonl"
+    ],
+    "family": "search",
+    "count": 72,
+    "representation": "published realistic information-seeking task text"
+  },
+  "sampling_rule": "Load both pinned AssistantBench JSONL files, deduplicate by id, compute SHA256(id + '\n' + task), sort ascending by digest, and select the first 72. The rule is fixed before the first successful score.",
+  "label_visibility": "The search family label is attached only after Router V6 and Router V7 predictions are produced.",
+  "primary_metric": "Search-family Hit@1 over the 72-task AssistantBench holdout",
+  "secondary_metrics": [
+    "Router V6 Hit@1 on the identical new holdout",
+    "absolute V7-V6 Hit@1 delta",
+    "mean confidence",
+    "confusion matrix"
+  ],
+  "anti_tuning_rule": "After the first successful scored run, Router V7 algorithm, weights, source pin, sampling rule, and task count are frozen for this holdout. Any changed router must become Router V8 with a new holdout.",
+  "evidence_boundary": "This is task-family routing transfer only. It does not claim AssistantBench answer accuracy, web browsing correctness, source quality, or end-to-end research completion."
+}
