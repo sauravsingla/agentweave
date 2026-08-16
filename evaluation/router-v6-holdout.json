@@ -1,0 +1,31 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-successful-score",
+  "router_v6_base_commit": "b36e9fddc5f32aa89d31ebb4c43a9b0acff8ee1d",
+  "development_data": {
+    "name": "General-AgentBench published baseline prompts",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "usage": "Router V6 may fit on these development prompts only. No Router V2-V5 external holdout task is reused for V6 scoring."
+  },
+  "external_holdout": {
+    "name": "WebArena",
+    "repository": "web-arena-x/visualwebarena",
+    "commit": "89f5af29305c3d1e9f97ce4421462060a70c9a03",
+    "path": "config_files/wa/test_webarena.raw.json",
+    "family": "terminalbench",
+    "count": 72,
+    "representation": "published WebArena natural-language intents"
+  },
+  "sampling_rule": "Load published WebArena task intents, compute SHA256(task_id + '\\n' + intent), sort ascending by digest, and select the first 72. The rule is fixed before the first successful score.",
+  "label_visibility": "The terminalbench family label is attached only after Router V5 and Router V6 predictions are produced.",
+  "primary_metric": "Interactive-family Hit@1 over the 72-task WebArena holdout",
+  "secondary_metrics": [
+    "Router V5 Hit@1 on the identical new holdout",
+    "absolute V6-V5 Hit@1 delta",
+    "mean confidence",
+    "confusion matrix"
+  ],
+  "anti_tuning_rule": "After the first successful scored run, Router V6 algorithm, weights, source pin, sampling rule, and task count are frozen for this holdout. Any changed router must become Router V7 with a new holdout.",
+  "evidence_boundary": "This is task-family routing transfer only. It does not claim native WebArena environment success, browser action correctness, or end-to-end task completion."
+}
