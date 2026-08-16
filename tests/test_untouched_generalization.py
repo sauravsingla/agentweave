@@ -1,5 +1,15 @@
+from importlib.util import module_from_spec, spec_from_file_location
+from pathlib import Path
+
 from agentweave.requirements import RequirementAnalyzer
-from scripts.untouched_generalization import predict_family
+
+
+SCRIPT = Path(__file__).resolve().parents[1] / 'scripts' / 'untouched_generalization.py'
+spec = spec_from_file_location('untouched_generalization_eval', SCRIPT)
+module = module_from_spec(spec)
+assert spec and spec.loader
+spec.loader.exec_module(module)
+predict_family = module.predict_family
 
 
 def classify(text: str) -> str:
