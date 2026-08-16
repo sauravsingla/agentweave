@@ -13,6 +13,7 @@ class ReputationStore:
         with self._conn() as c:
             c.execute('create table if not exists agents (agent_id text primary key, payload text not null)')
             c.execute('create table if not exists outcomes (id integer primary key autoincrement, agent_id text, success integer, score real, detail text, created_at datetime default current_timestamp)')
+            c.execute('create table if not exists workflow_checkpoints (workflow_id text primary key, payload text not null, updated_at datetime default current_timestamp)')
     def save_agent(self,a:AgentProfile):
         with self._conn() as c: c.execute('insert into agents(agent_id,payload) values(?,?) on conflict(agent_id) do update set payload=excluded.payload',(a.agent_id,json.dumps(a.to_dict())))
     def load_agents(self):
@@ -30,3 +31,23 @@ class ReputationStore:
         with self._conn() as c:
             rows=c.execute('select success,score,detail,created_at from outcomes where agent_id=? order by id desc limit ?',(agent_id,limit)).fetchall()
         return [{'success':bool(r[0]),'score':r[1],'detail':json.loads(r[2] or '{}'),'created_at':r[3]} for r in rows]
+    def save_workflow_checkpoint(self,workflow_id,payload):
+        body=json.dumps(payload)
+        with self._conn() as c:
+            c.execute(
+                'insert into workflow_checkpoints(workflow_id,payload,updated_at) values(?,?,current_timestamp) '
+                'on conflict(workflow_id) do update set payload=excluded.payload,updated_at=current_timestamp',
+                (workflow_id,body),
+            )
+    def load_workflow_checkpoint(self,workflow_id):
+        with self._conn() as c:
+            row=c.execute('select payload from workflow_checkpoints where workflow_id=?',(workflow_id,)).fetchone()
+        return json.loads(row[0]) if row else None
+    def list_workflow_checkpoints(self,limit=100):
+        with self._conn() as c:
+            rows=c.execute('select payload from workflow_checkpoints order by updated_at desc limit ?',(int(limit),)).fetchall()
+        return [json.loads(row[0]) for row in rows]
+    def delete_workflow_checkpoint(self,workflow_id):
+        with self._conn() as c:
+            cur=c.execute('delete from workflow_checkpoints where workflow_id=?',(workflow_id,))
+        return bool(cur.rowcount)
