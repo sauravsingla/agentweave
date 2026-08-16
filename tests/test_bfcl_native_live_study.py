@@ -6,8 +6,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.bfcl_native_live_study import CATEGORY, exact_mcnemar, read_score_rows, select_ids, wilson
-from scripts.bfcl_routing_proxy import _provider_group, _tool_name
+from scripts.bfcl_native_live_study import CATEGORY, TARGET_TOOL_COUNT, augment_rows, exact_mcnemar, read_score_rows, select_ids, wilson
+from scripts.bfcl_routing_proxy import Router, _provider_group, _tool_name
 
 
 def test_sample_selection_is_deterministic_and_content_blind(tmp_path: Path):
@@ -22,6 +22,27 @@ def test_sample_selection_is_deterministic_and_content_blind(tmp_path: Path):
     assert first == second
     assert len(first) == 2
     assert set(first) <= {"multiple_1", "multiple_2", "multiple_3"}
+
+
+def test_pressure_augmentation_is_deterministic_and_preserves_originals():
+    rows=[]
+    for i in range(TARGET_TOOL_COUNT + 4):
+        rows.append({"id":f"multiple_{i}","question":[[{"role":"user","content":f"q{i}"}]],"function":[{"name":f"tool_{i}","description":f"d{i}","parameters":{"type":"dict","properties":{}}}]})
+    a,ma=augment_rows(rows,["multiple_0"]); b,mb=augment_rows(rows,["multiple_0"])
+    assert ma == mb
+    assert len(ma["multiple_0"]["augmented_tools"]) == TARGET_TOOL_COUNT
+    assert "tool_0" in ma["multiple_0"]["augmented_tools"]
+    assert a == b
+
+
+def test_random_router_is_deterministic_and_budgeted():
+    tools=[{"type":"function","function":{"name":f"tool_{i}","description":"x"}} for i in range(16)]
+    messages=[{"role":"user","content":"choose something"}]
+    router=Router("random-router")
+    first=[_tool_name(t) for t in router.select(messages,tools)]
+    second=[_tool_name(t) for t in router.select(messages,tools)]
+    assert first == second
+    assert len(first) == 8
 
 
 def test_wilson_and_exact_mcnemar_are_bounded():
