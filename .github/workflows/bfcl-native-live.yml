@@ -1,0 +1,73 @@
+name: BFCL Native Live Study
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+  OPENAI_API_KEY_LIVE: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  bfcl-native-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install AgentWeave study dependencies
+        run: |
+          pip install -e .[dev]
+          pip install 'sentence-transformers>=5.1,<6' 'bfcl-eval==2025.12.17'
+      - name: Run protocol and utility tests
+        run: pytest -q tests/test_bfcl_native_live_study.py
+      - name: Fetch pinned BFCL source and verify untouched sample
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ShishirPatil/gorilla.git external-gorilla
+          cd external-gorilla
+          git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
+          test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
+          cd ../external-gorilla/berkeley-function-call-leaderboard
+          pip install -e .
+          cd ../..
+          python scripts/bfcl_native_live_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-native-live-results \
+            --validate-only
+      - name: Report live credential availability
+        shell: bash
+        run: |
+          if [ -n "${OPENAI_API_KEY_LIVE:-}" ]; then
+            echo "OPENAI_API_KEY_AVAILABLE=true"
+          else
+            echo "OPENAI_API_KEY_AVAILABLE=false"
+          fi
+      - name: Run preregistered live BFCL study
+        if: ${{ env.OPENAI_API_KEY_LIVE != '' }}
+        run: |
+          python scripts/bfcl_native_live_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-native-live-results
+      - name: Mark live study pending when no provider credential exists
+        if: ${{ env.OPENAI_API_KEY_LIVE == '' }}
+        run: |
+          cat > bfcl-native-live-results/LIVE_RUN_PENDING.md <<'EOF'
+          # Live provider run pending
+
+          The BFCL protocol, benchmark commit, sample rule, model snapshot, strategies, statistics, and price schedule are frozen. No `OPENAI_API_KEY` repository secret was available to this workflow, so no live score, latency, token usage, or provider-priced cost has been fabricated.
+          EOF
+      - name: Upload BFCL native study evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfcl-native-live-evidence
+          path: bfcl-native-live-results/
