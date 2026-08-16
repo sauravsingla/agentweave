@@ -1,0 +1,53 @@
+{
+  "protocol_version": 1,
+  "status": "frozen-before-first-successful-score",
+  "router_v4_base_commit": "ca03b23c8485b87e7b5b9a45591a574909f3d432",
+  "development_data": {
+    "name": "General-AgentBench published baseline prompts",
+    "repository": "cxcscmu/General-AgentBench",
+    "commit": "35f5c027c31ddcb3366b28674c6cb2957460c0e2",
+    "usage": "Router V4 may fit on these development prompts only. Router V2 and Router V3 external holdouts are not reused for V4 scoring."
+  },
+  "external_holdout": [
+    {
+      "name": "CRUXEval",
+      "repository": "facebookresearch/cruxeval",
+      "commit": "190faf16d175b5847b0af05d937872b1fb395942",
+      "path": "data/cruxeval.jsonl",
+      "family": "swebench",
+      "count": 24,
+      "representation": "code plus input wrapped as a code-reasoning request"
+    },
+    {
+      "name": "WorkArena",
+      "repository": "ServiceNow/WorkArena",
+      "commit": "a772230a94cf1caf4166b8ead3983f3b3786455b",
+      "path": "src/browsergym/workarena/tasks",
+      "family": "terminalbench",
+      "count": 24,
+      "representation": "published user-facing goal templates extracted from goal-producing task code"
+    },
+    {
+      "name": "BrowserGym MiniWoB",
+      "repository": "ServiceNow/BrowserGym",
+      "commit": "9e779f087de9a65668b6974d11f9ce9816026e96",
+      "path": "browsergym/experiments/src/browsergym/experiments/benchmark/metadata/miniwob.csv",
+      "family": "terminalbench",
+      "count": 24,
+      "representation": "held-out MiniWoB benchmark task names converted to task requests"
+    }
+  ],
+  "sampling_rule": "For each source, collect valid prompts, compute SHA256(source_id + '\\n' + prompt), sort ascending by digest, and select the first requested count. The rule is fixed before the first successful score.",
+  "label_visibility": "Source family labels are attached only after Router V3 and Router V4 predictions are produced.",
+  "primary_metric": "Router V4 family Hit@1 over all 72 external holdout tasks",
+  "secondary_metrics": [
+    "Router V3 Hit@1 on the identical new holdout",
+    "absolute V4-V3 Hit@1 delta",
+    "macro family accuracy",
+    "per-source accuracy",
+    "mean confidence",
+    "confusion matrix"
+  ],
+  "anti_tuning_rule": "After the first successful scored run, Router V4 algorithm, hierarchy, weights, source pins, sampling rule, and selected task counts are frozen for this holdout. Any changed router must become Router V5 with a new holdout.",
+  "evidence_boundary": "This is task-family routing transfer only. It does not claim CRUXEval program-execution correctness, WorkArena task success, or MiniWoB browser-environment success."
+}

@@ -1,0 +1,88 @@
+name: Router V4 External Holdout
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  router-v4-transfer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install AgentWeave
+        run: pip install -e .[dev]
+      - name: Verify Router V4 tests
+        run: pytest -q tests/test_router_v4.py tests/test_router_v3.py tests/test_router_v2.py tests/test_untouched_generalization.py
+
+      - name: Fetch pinned General-AgentBench development prompts
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --no-checkout https://github.com/cxcscmu/General-AgentBench.git external-general-agentbench
+          cd external-general-agentbench
+          git sparse-checkout init --cone
+          git sparse-checkout set \
+            general_agent/traces/baseline/mathhay_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/mcpbench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/search_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/swebench_Claude-Haiku-4.5_distraction_100 \
+            general_agent/traces/baseline/tau2bench_Claude-Haiku-4.5_distraction_all \
+            general_agent/traces/baseline/terminalbench_Claude-Haiku-4.5_distraction_100
+          git checkout 35f5c027c31ddcb3366b28674c6cb2957460c0e2
+          test "$(git rev-parse HEAD)" = "35f5c027c31ddcb3366b28674c6cb2957460c0e2"
+
+      - name: Fetch preregistered Router V4 holdout
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p external-v4
+
+          git clone --filter=blob:none --no-checkout https://github.com/facebookresearch/cruxeval.git external-v4/cruxeval
+          cd external-v4/cruxeval
+          git sparse-checkout init --cone
+          git sparse-checkout set data
+          git checkout 190faf16d175b5847b0af05d937872b1fb395942
+          test "$(git rev-parse HEAD)" = "190faf16d175b5847b0af05d937872b1fb395942"
+          cd ../..
+
+          git clone --filter=blob:none --no-checkout https://github.com/ServiceNow/WorkArena.git external-v4/workarena
+          cd external-v4/workarena
+          git sparse-checkout init --cone
+          git sparse-checkout set src/browsergym/workarena/tasks
+          git checkout a772230a94cf1caf4166b8ead3983f3b3786455b
+          test "$(git rev-parse HEAD)" = "a772230a94cf1caf4166b8ead3983f3b3786455b"
+          cd ../..
+
+          git clone --filter=blob:none --no-checkout https://github.com/ServiceNow/BrowserGym.git external-v4/browsergym
+          cd external-v4/browsergym
+          git sparse-checkout init --cone
+          git sparse-checkout set browsergym/experiments/src/browsergym/experiments/benchmark/metadata
+          git checkout 9e779f087de9a65668b6974d11f9ce9816026e96
+          test "$(git rev-parse HEAD)" = "9e779f087de9a65668b6974d11f9ce9816026e96"
+          cd ../..
+
+      - name: Run Router V4 new holdout once
+        run: |
+          python scripts/router_v4_holdout.py \
+            --development-root external-general-agentbench/general_agent/traces/baseline \
+            --external-root external-v4
+
+      - name: Upload Router V4 evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: router-v4-external-holdout-evidence
+          path: |
+            router-v4-holdout-results.json
+            router-v4-holdout-results.md
+            evaluation/router-v4-holdout.json
