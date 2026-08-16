@@ -1,52 +1,64 @@
 {
-  "study_id": "bfcl-native-local-v3-multiple",
+  "study_id": "bfcl-routing-pressure-v4",
   "status": "preregistered-before-first-score",
-  "supersedes_study": "bfcl-native-local-v2-fast",
-  "supersession_reason": "The completed v2 simple_python negative control exposed exactly one tool per task, so all three strategies were effectively identical and each scored 1/12. V3 moves to a new untouched BFCL multiple-function category and a new content-blind sample seed so routing and tool pruning can materially differ. V1 and v2 results remain preserved in CI history and are not reinterpreted.",
+  "supersedes_study": "bfcl-native-local-v3-multiple",
+  "supersession_reason": "V3 multiple completed at 0/12 for all strategies and exposed only 2.67 tools per task on average, leaving essentially no routing pressure. V4 uses a fresh untouched task sample and deterministically augments only the model-visible candidate set with BFCL-derived distractor functions. Prior v1-v3 scores remain preserved in CI history and are not reinterpreted.",
   "frozen_agentweave_commit": "a33e793aad02ad5da713957faa77bb82d5673e76",
   "benchmark": {
-    "name": "Berkeley Function Calling Leaderboard V4",
+    "name": "Berkeley Function Calling Leaderboard V4 routing-pressure stress test",
     "repository": "ShishirPatil/gorilla",
     "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
     "category": "multiple",
-    "native_metric": "BFCL single-turn AST/function-call validity",
+    "native_metric": "BFCL single-turn AST/function-call validity against the restored original BFCL evaluator data",
     "sample_size": 12,
-    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-native-v3-multiple:' + id) digest from BFCL_v4_multiple.json. No task-content filtering is permitted."
+    "augmented_tool_count": 16,
+    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-routing-pressure-v4:' + id) digest from BFCL_v4_multiple.json. No task-content or outcome filtering is permitted.",
+    "augmentation_rule": "For each sampled task, retain every original BFCL candidate function and append unique distractor functions drawn from the same pinned BFCL_v4_multiple.json, ordered by SHA256('agentweave-bfcl-distractors-v4:' + task_id + ':' + function_name), until 16 model-visible functions are present. Restore the original BFCL dataset before native evaluation."
   },
   "inference": {
     "mode": "self-hosted CPU",
-    "model": "MadeAgents/Hammer2.1-0.5b",
+    "model": "MadeAgents/Hammer2.1-1.5b",
     "model_source": "Hugging Face public repository; automatically downloaded by the workflow",
     "temperature": 0,
     "max_new_tokens": 128,
     "bfcl_transport_handler": "MiniCPM-SALA-FC registry handler used only as an OpenAI-compatible BFCL transport/decoder shim; no external model API is called",
-    "external_api_spend_usd": 0.0,
-    "cost_definition": "No external API/provider spend. Report measured local wall-clock inference time and token counts; do not translate hosted GitHub runner time into a fictitious provider bill."
+    "external_api_spend_usd": 0.0
   },
   "strategies": {
-    "single-agent": {"description": "One local Hammer model receives the complete BFCL tool set for each request.", "tool_policy": "all"},
-    "semantic-router": {"description": "The same local model receives only the top-12 tools by zero-shot MiniLM cosine similarity.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "top_k_tools": 12},
-    "agentweave": {"description": "The same local model uses MiniLM to score tool-provider groups; AgentWeave GlobalTeamOptimizer selects up to three provider agents and exposes only their tools.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "max_provider_agents": 3, "max_tools": 24}
+    "single-agent": {"description": "Same local model receives all 16 model-visible candidate functions."},
+    "random-router": {"description": "Deterministic content-independent top-8 control using SHA256 ordering.", "top_k_tools": 8},
+    "semantic-router": {"description": "Zero-shot MiniLM cosine-similarity top-8 router.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "top_k_tools": 8},
+    "agentweave": {"description": "MiniLM scores tool-provider groups and AgentWeave GlobalTeamOptimizer selects up to three provider agents, capped at eight tools.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "max_provider_agents": 3, "max_tools": 8}
   },
   "primary_hypotheses": [
-    "H1: AgentWeave BFCL native task success is greater than single-agent task success.",
-    "H2: AgentWeave BFCL native task success is greater than semantic-router task success.",
-    "H3: AgentWeave reduces mean model input tokens relative to single-agent without increasing median local model latency by more than 25%."
+    "H1: AgentWeave BFCL native task success is greater than the all-tools single-agent baseline.",
+    "H2: AgentWeave BFCL native task success is greater than the deterministic random top-8 baseline.",
+    "H3: AgentWeave BFCL native task success is greater than the semantic top-8 baseline.",
+    "H4: AgentWeave materially reduces model-visible tools and input tokens while retaining a high fraction of the original BFCL candidate set."
   ],
   "statistics": {
     "success_interval": "Wilson 95% confidence interval",
     "paired_success_test": "exact McNemar test",
     "paired_effect_interval": "10,000-resample paired bootstrap 95% confidence interval",
     "alpha": 0.05,
-    "power_note": "n=12 is a fast resource-constrained CPU pilot; significance is reported exactly but low power must be acknowledged."
+    "power_note": "n=12 is a resource-constrained pilot; significance is reported exactly and low power must be acknowledged."
   },
-  "measurements": ["BFCL native per-task success", "local wall-clock model latency", "input/output tokens", "external API spend ($0)", "tools exposed per request", "all BFCL failure/error records"],
-  "anti_tuning_rules": [
-    "The prior v1 and v2 scored results are preserved and are not used to select v3 task contents.",
-    "V3 benchmark commit, category, sample ids/rule, model, router hyperparameters, hypotheses, and generation settings do not change after the first v3 scored run.",
-    "Any post-score modification requires a new study id and untouched sample.",
-    "All failures remain in the evidence artifact.",
-    "All three strategies use exactly the same sampled tasks and local model."
+  "measurements": [
+    "BFCL native per-task success",
+    "original BFCL candidate recall after routing",
+    "all-original-candidates-retained rate",
+    "model-visible tools",
+    "local wall-clock model latency",
+    "input/output tokens",
+    "external API spend ($0)",
+    "all BFCL failure/error records"
   ],
-  "evidence_boundary": "This is a fast benchmark-native BFCL V4 single-turn multiple-function pilot using an automatically downloaded open model with no API key. It measures real local inference latency and tokens and has $0 external API spend. It is not a full BFCL leaderboard score, not a multi-turn result, and not a production-provider cost study."
+  "anti_tuning_rules": [
+    "The prior v1-v3 scored results are preserved and are not used to select v4 task contents.",
+    "V4 task sample, augmentation seed, 16-tool pressure level, 8-tool routing budgets, model, hypotheses, and generation settings do not change after the first v4 score.",
+    "All distractors come from the same pinned BFCL category using a content-independent hash rule.",
+    "The original BFCL data is restored before evaluation so augmentation changes model-visible context, not evaluator ground truth.",
+    "Any post-score modification requires a new study id and untouched sample."
+  ],
+  "evidence_boundary": "This is a BFCL-derived routing-pressure stress test, not an official full BFCL leaderboard score. It preserves untouched BFCL questions and native BFCL evaluation but deterministically augments model-visible tool context to test routing under controlled distractor pressure. It is keyless, local, single-turn, and has $0 external API spend."
 }
