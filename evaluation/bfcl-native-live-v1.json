@@ -1,15 +1,17 @@
 {
-  "study_id": "bfcl-native-local-v1",
+  "study_id": "bfcl-native-local-v2-fast",
   "status": "preregistered-before-first-score",
+  "supersedes_study": "bfcl-native-local-v1",
+  "supersession_reason": "The completed v1 multi_turn_base CPU pilot took roughly 2.5 hours and all three strategies scored 0/12. V2 moves to a new untouched single-turn BFCL category and a new content-blind sample seed; v1 results remain preserved in CI history and are not reinterpreted.",
   "frozen_agentweave_commit": "a33e793aad02ad5da713957faa77bb82d5673e76",
   "benchmark": {
     "name": "Berkeley Function Calling Leaderboard V4",
     "repository": "ShishirPatil/gorilla",
     "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
-    "category": "multi_turn_base",
-    "native_metric": "BFCL multi-turn valid/task success",
+    "category": "simple_python",
+    "native_metric": "BFCL single-turn AST/function-call validity",
     "sample_size": 12,
-    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-native-v1:' + id) digest from BFCL_v4_multi_turn_base.json. No task-content filtering is permitted."
+    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-native-v2-fast:' + id) digest from BFCL_v4_simple_python.json. No task-content filtering is permitted."
   },
   "inference": {
     "mode": "self-hosted CPU",
@@ -17,12 +19,12 @@
     "model_source": "Hugging Face public repository; automatically downloaded by the workflow",
     "temperature": 0,
     "max_new_tokens": 128,
-    "bfcl_transport_handler": "gpt-4.1-mini-2025-04-14-FC OpenAI-compatible handler used only as a transport/decoder shim; no OpenAI API is called",
+    "bfcl_transport_handler": "MiniCPM-SALA-FC registry handler used only as an OpenAI-compatible BFCL transport/decoder shim; no external model API is called",
     "external_api_spend_usd": 0.0,
     "cost_definition": "No external API/provider spend. Report measured local wall-clock inference time and token counts; do not translate hosted GitHub runner time into a fictitious provider bill."
   },
   "strategies": {
-    "single-agent": {"description": "One local Hammer model receives the complete BFCL tool set for each step.", "tool_policy": "all"},
+    "single-agent": {"description": "One local Hammer model receives the complete BFCL tool set for each request.", "tool_policy": "all"},
     "semantic-router": {"description": "The same local model receives only the top-12 tools by zero-shot MiniLM cosine similarity.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "top_k_tools": 12},
     "agentweave": {"description": "The same local model uses MiniLM to score tool-provider groups; AgentWeave GlobalTeamOptimizer selects up to three provider agents and exposes only their tools.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "max_provider_agents": 3, "max_tools": 24}
   },
@@ -36,14 +38,15 @@
     "paired_success_test": "exact McNemar test",
     "paired_effect_interval": "10,000-resample paired bootstrap 95% confidence interval",
     "alpha": 0.05,
-    "power_note": "n=12 is a resource-constrained CPU pilot; significance is reported exactly but low power must be acknowledged."
+    "power_note": "n=12 is a fast resource-constrained CPU pilot; significance is reported exactly but low power must be acknowledged."
   },
   "measurements": ["BFCL native per-task success", "local wall-clock model latency", "input/output tokens", "external API spend ($0)", "tools exposed per request", "all BFCL failure/error records"],
   "anti_tuning_rules": [
-    "Benchmark commit, sample ids/rule, model, router hyperparameters, hypotheses, and generation settings do not change after the first scored run.",
+    "The prior v1 scored results are preserved and are not used to select v2 task contents.",
+    "V2 benchmark commit, category, sample ids/rule, model, router hyperparameters, hypotheses, and generation settings do not change after the first v2 scored run.",
     "Any post-score modification requires a new study id and untouched sample.",
     "All failures remain in the evidence artifact.",
     "All three strategies use exactly the same sampled tasks and local model."
   ],
-  "evidence_boundary": "This is benchmark-native BFCL task success using an automatically downloaded open model with no API key. It measures real local inference latency and tokens and has $0 external API spend. It is a low-resource CPU pilot, not a production-provider cost study and not a substitute for a larger powered GPU run."
+  "evidence_boundary": "This is a fast benchmark-native BFCL V4 single-turn pilot using an automatically downloaded open model with no API key. It measures real local inference latency and tokens and has $0 external API spend. It is not a full BFCL leaderboard score, not a multi-turn result, and not a production-provider cost study."
 }
