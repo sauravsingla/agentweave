@@ -1,0 +1,45 @@
+{
+  "study_id": "bfcl-public-openfunctions-v3",
+  "status": "preregistered-before-first-score",
+  "frozen_agentweave_commit": "a33e793aad02ad5da713957faa77bb82d5673e76",
+  "benchmark": {
+    "name": "Berkeley Function Calling Leaderboard V4",
+    "repository": "ShishirPatil/gorilla",
+    "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+    "category": "multiple",
+    "native_metric": "BFCL single-turn AST/function-call validity",
+    "sample_size": 12,
+    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-public-v3:' + id) digest from BFCL_v4_multiple.json. No task-content filtering is permitted."
+  },
+  "inference": {
+    "mode": "Berkeley public OpenFunctions endpoint via BFCL's official gorilla-openfunctions-v2 handler",
+    "model": "gorilla-openfunctions-v2",
+    "endpoint_documented_by_upstream": "http://luigi.millennium.berkeley.edu:8000/v1",
+    "api_key_requirement": "none; upstream documentation uses EMPTY",
+    "external_api_spend_usd": 0.0
+  },
+  "strategies": {
+    "single-agent": {"description": "OpenFunctions receives the complete BFCL function set.", "tool_policy": "all"},
+    "semantic-router": {"description": "OpenFunctions receives only the top-12 functions by zero-shot MiniLM cosine similarity.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "top_k_tools": 12},
+    "agentweave": {"description": "MiniLM scores provider groups and AgentWeave GlobalTeamOptimizer selects up to three provider agents before OpenFunctions inference.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "max_provider_agents": 3, "max_tools": 24}
+  },
+  "primary_hypotheses": [
+    "H1: AgentWeave BFCL native task success is greater than single-agent task success.",
+    "H2: AgentWeave BFCL native task success is greater than semantic-router task success.",
+    "H3: AgentWeave reduces the mean number of functions exposed per task relative to single-agent while preserving native task success."
+  ],
+  "statistics": {
+    "success_interval": "Wilson 95% confidence interval",
+    "paired_success_test": "exact McNemar test",
+    "paired_effect_interval": "10,000-resample paired bootstrap 95% confidence interval",
+    "alpha": 0.05,
+    "power_note": "n=12 is an exploratory keyless endpoint pilot; significance is reported exactly but low power must be acknowledged."
+  },
+  "anti_tuning_rules": [
+    "This v3 study uses a new study id and new content-blind sample distinct from the already-run v1 and v2 protocols.",
+    "Benchmark commit, category, sample rule, model, routing hyperparameters, and hypotheses do not change after the first scored run.",
+    "All three strategies use the same sampled tasks and the same public model endpoint.",
+    "The original BFCL dataset is restored before native evaluation so routing changes only model-visible function context, not evaluator ground truth."
+  ],
+  "evidence_boundary": "This is a keyless public-endpoint BFCL pilot. Availability and latency depend on Berkeley's public research service. It is not a full BFCL leaderboard score and does not claim provider SLA or production cost."
+}
