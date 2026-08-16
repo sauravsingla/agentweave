@@ -17,6 +17,7 @@ from .observability import Observability
 from .policy import GovernancePolicyEngine, PolicyContext
 from .lifecycle import LongRunningA2AClient
 from .protocol_depth import PushNotificationConfigClient
+from .recovery import RuntimeRecoveryManager
 
 class AgentWeave:
     def __init__(self,a2a=None,db_path='agentweave.db',*,store=None,security_validator=None,result_validator=None,semantic_verifier=None,policy_engine=None,use_native=True):
@@ -26,6 +27,7 @@ class AgentWeave:
         self.security=security_validator or SecurityValidator(); self.identity=IdentityVerifier(); self.result_validator=result_validator or ResultValidator(); self.semantic_verifier=semantic_verifier or SemanticResultVerifier(); self.retest_policy=RetestPolicy(); self.a2a=a2a or InMemoryA2AAdapter()
         self.collaboration=CollaborationEngine(self.a2a); self.consensus=ConsensusEngine(); self.conflicts=ConflictResolver(self.a2a)
         self.policy=policy_engine or GovernancePolicyEngine(); self.observability=Observability(self.store); self.interop=A2AInteropSuite(); self.lifecycle=LongRunningA2AClient(); self.push_notifications=PushNotificationConfigClient()
+        self.recovery=RuntimeRecoveryManager(self.a2a,self.matcher,self.trust,self.register,self.observability)
         self.did=DIDResolver(); self.vc=VerifiableCredentialVerifier(); self.revocations=RevocationRegistry(); self.cert_rotation=CertificateRotationManager(); self.keys=KeyManager(); self.attestation=WorkloadAttestationVerifier(); self.sandbox=DockerSandbox(); self.sandbox_policy=SandboxPolicy()
 
     def register(self,agent):
@@ -82,7 +84,7 @@ class AgentWeave:
             results=await self.interop.run(targets,prompt)
         return [x.__dict__ for x in results]
 
-    async def solve(self,text,*,domains=None,knowledge=None,local_only=False,max_latency_ms=None,privacy_level=None,max_agents=5,rounds=2,policy_context=None,semantic_verify=False):
+    async def solve(self,text,*,domains=None,knowledge=None,local_only=False,max_latency_ms=None,privacy_level=None,max_agents=5,rounds=2,policy_context=None,semantic_verify=False,max_failovers=2):
         started_total=time.perf_counter()
         with self.observability.tracer.span('agentweave.requirement.analyze',requirement=text):
             req=self.analyzer.analyze(text,domains=domains,knowledge=knowledge,local_only=local_only,max_latency_ms=max_latency_ms,privacy_level=privacy_level)
@@ -103,19 +105,50 @@ class AgentWeave:
         with self.observability.tracer.span('agentweave.a2a.collaboration',rounds=rounds,team_size=len(team)):
             collaboration_started=time.perf_counter(); transcript=await self.collaboration.deliberate(team,text,rounds=rounds); self.observability.metrics.observe('collaboration_latency_ms',(time.perf_counter()-collaboration_started)*1000)
         final_round=max((r['round'] for r in transcript),default=0); final_results=[r for r in transcript if r['round']==final_round]
+
+        recovery={'effective_team':list(team),'final_results':list(final_results),'attempt_results':[],'events':[],'failed_agent_ids':[],'recovered_agent_ids':[]}
+        if any(not r.get('success') for r in final_results) and max_failovers>0:
+            with self.observability.tracer.span('agentweave.runtime.recovery',max_failovers=max_failovers):
+                recovery=await self.recovery.recover(req,text,team,final_results,candidates,max_failovers=max_failovers)
+            transcript.extend(recovery['attempt_results'])
+            final_results=recovery['final_results']
+        effective_team=recovery['effective_team']
+
         with self.observability.tracer.span('agentweave.consensus'):
             consensus=self.consensus.evaluate(final_results)
         with self.observability.tracer.span('agentweave.conflict_resolution'):
-            resolution=await self.conflicts.resolve(team,text,final_results,consensus)
+            resolution=await self.conflicts.resolve(effective_team,text,final_results,consensus)
         with self.observability.tracer.span('agentweave.result_validation'):
             validation=self.result_validator.validate(final_results,req.capabilities,consensus=consensus)
             semantic=None
             if semantic_verify:
                 semantic=await self.semantic_verifier.verify(final_results,text); validation['semantic']=semantic; validation['score']=.65*validation['score']+.35*semantic['score']; validation['passed']=validation['passed'] and semantic['score']>=.45
         per_agent={r['agent_id']:r for r in final_results}
-        with self.observability.tracer.span('agentweave.reputation.update',agents=len(team)):
-            for member in team:
-                result=per_agent.get(member.agent.agent_id,{}); success=bool(result.get('success')) and validation['passed']; self.trust.update(member.agent,success,validation['score'],{'consensus':consensus,'resolution':resolution,'validation':validation}); self.register(member.agent)
+        with self.observability.tracer.span('agentweave.reputation.update',agents=len(effective_team)):
+            for member in effective_team:
+                result=per_agent.get(member.agent.agent_id,{}); success=bool(result.get('success')) and validation['passed']; self.trust.update(member.agent,success,validation['score'],{'consensus':consensus,'resolution':resolution,'validation':validation,'recovery':bool(result.get('recovery'))}); self.register(member.agent)
         self.observability.metrics.observe('solve_latency_ms',(time.perf_counter()-started_total)*1000)
         self.observability.metrics.inc('solve_total',status='completed' if validation['passed'] else 'needs-review')
-        return {'status':'completed' if validation['passed'] else 'needs-review','requirement':text,'required_capabilities':sorted(req.capabilities),'selected_agents':[m.agent.agent_id for m in team],'capability_coverage':self.graph.coverage(req,[m.agent for m in team]),'native_acceleration':self.matcher.native_available,'policy':policy_decisions,'selection_explanation':explanation,'transcript':transcript,'consensus':consensus,'resolution':resolution,'result_validation':validation,'semantic_validation':semantic,'observability':self.observability.snapshot()}
+        return {
+            'status':'completed' if validation['passed'] else 'needs-review',
+            'requirement':text,
+            'required_capabilities':sorted(req.capabilities),
+            'selected_agents':[m.agent.agent_id for m in team],
+            'effective_agents':[m.agent.agent_id for m in effective_team],
+            'capability_coverage':self.graph.coverage(req,[m.agent for m in effective_team]),
+            'native_acceleration':self.matcher.native_available,
+            'policy':policy_decisions,
+            'selection_explanation':explanation,
+            'transcript':transcript,
+            'recovery':{
+                'attempted':bool(recovery['failed_agent_ids']),
+                'failed_agent_ids':recovery['failed_agent_ids'],
+                'recovered_agent_ids':recovery['recovered_agent_ids'],
+                'events':recovery['events'],
+            },
+            'consensus':consensus,
+            'resolution':resolution,
+            'result_validation':validation,
+            'semantic_validation':semantic,
+            'observability':self.observability.snapshot(),
+        }
