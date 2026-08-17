@@ -35,13 +35,12 @@ BFCL task + normal BFCL candidate functions
         normal BFCL decoder/evaluator
 ```
 
-The upstream-ready handler is in:
+The upstream-ready handler and router are in:
 
-`integrations/bfcl_upstream/agentweave_hammer.py`
+- `integrations/bfcl_upstream/agentweave_hammer.py`
+- `integrations/bfcl_upstream/agentweave_router.py`
 
-The reusable routing implementation is in:
-
-`agentweave/bfcl.py`
+They intentionally live outside `agentweave/` so existing preregistered frozen-router studies remain byte-for-byte protected by their original anti-tuning scope.
 
 ## Proposed BFCL model identity
 
@@ -57,13 +56,14 @@ The submission should clearly identify AgentWeave as a routing/orchestration sys
 
 ## Upstream files
 
-### 1. Model handler
+### 1. Router and model handler
 
-Copy `integrations/bfcl_upstream/agentweave_hammer.py` to:
+Copy both files into BFCL's local inference handler directory:
 
-`berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/agentweave_hammer.py`
+- `integrations/bfcl_upstream/agentweave_router.py` -> `berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/agentweave_router.py`
+- `integrations/bfcl_upstream/agentweave_hammer.py` -> `berkeley-function-call-leaderboard/bfcl_eval/model_handler/local_inference/agentweave_hammer.py`
 
-The handler subclasses BFCL's existing `HammerHandler` and overrides only `_format_prompt`. It receives BFCL's complete function list and routes that list immediately before prompt construction.
+The handler subclasses BFCL's existing `HammerHandler` and overrides only `_format_prompt`. It receives BFCL's complete function list and routes that list immediately before prompt construction. The router uses AgentWeave's public `GlobalTeamOptimizer` and model primitives; it does not alter BFCL data or evaluation logic.
 
 ### 2. `model_config.py`
 
@@ -98,7 +98,7 @@ Add `AgentWeave-Hammer2.1-1.5B` to BFCL's `bfcl_eval/constants/supported_models.
 
 ### 4. Dependency
 
-The upstream handler imports `agentweave.bfcl.BFCLToolRouter`. Until AgentWeave is available as a stable public package, a reproducible evaluation environment can install the repository directly:
+The router imports AgentWeave's public model and optimizer primitives. Until AgentWeave is available as a stable public package, a reproducible evaluation environment can install the repository directly:
 
 ```bash
 pip install 'git+https://github.com/sauravsingla/agentweave.git'
