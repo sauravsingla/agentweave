@@ -1,4 +1,4 @@
-name: BFCL Routing Pressure Study
+name: BFCL Routing Pressure Study V6
 
 on:
   pull_request:
@@ -13,9 +13,9 @@ env:
   TOKENIZERS_PARALLELISM: 'false'
 
 jobs:
-  bfcl-routing-pressure:
+  bfcl-routing-pressure-v6:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v5
         with:
@@ -35,20 +35,20 @@ jobs:
           cd external-gorilla
           git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
           test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
-      - name: Verify frozen routing-pressure sample before model download
+      - name: Verify frozen V6 sample before model download
         run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
             --output bfcl-native-live-results \
             --validate-only
-      - name: Run no-key BFCL routing-pressure study
+      - name: Run no-key BFCL V6 routing-pressure replication
         run: |
           python scripts/bfcl_native_live_study.py \
             --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
             --output bfcl-native-live-results
-      - name: Upload BFCL routing-pressure evidence
+      - name: Upload BFCL V6 replication evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bfcl-routing-pressure-evidence
+          name: bfcl-routing-pressure-v6-evidence
           path: bfcl-native-live-results/
