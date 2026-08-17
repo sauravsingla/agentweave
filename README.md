@@ -22,6 +22,20 @@ AgentWeave is an open-source framework for discovering, validating, selecting, a
 >
 > **AgentWeave adds:** which agents should communicate for this requirement, how confident are we in that requirement interpretation, can the agents be trusted, where should they execute, what should happen when a selected agent fails, how should work resume, and how should outputs be validated and learned from?
 
+
+## BFCL routing-pressure replication evidence
+
+AgentWeave has two frozen, keyless **BFCL-derived routing-pressure** studies using untouched BFCL questions and native BFCL evaluation with deterministically augmented model-visible tool context. These are **not official full BFCL leaderboard scores**.
+
+| Frozen study | Tasks | AgentWeave native success | Single-agent | Random top-8 | Semantic top-8 | Mean tools shown | Input-token reduction vs all-tools | Latency reduction vs all-tools |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **V5 pilot** | 12 | **2/12 (16.67%)** | 0/12 | 0/12 | 0/12 | **4.58** | **63.29%** | **54.92%** |
+| **V6 untouched replication** | 48 | **6/48 (12.5%)** | 0/48 | 0/48 | 0/48 | **4.77** | **61.70%** | **50.95%** |
+
+V6 excluded every V5 task (**zero overlap**) while keeping the same pinned BFCL source, local `MadeAgents/Hammer2.1-1.5b` model, 16-tool pressure, baselines, AgentWeave 4-provider/6-tool budget, generation settings, and evaluator. For V6, AgentWeave exceeded each matched baseline by **+12.5 percentage points**; exact paired McNemar **p = 0.03125**, with paired-bootstrap 95% CI **+4.17 to +22.92 pp**. Compared with all-tools, V6 used **70.18% fewer visible tools**, **61.70% fewer input tokens**, and **50.95% lower mean model latency**.
+
+Full frozen evidence: [`BFCL_V5_RESULTS.md`](BFCL_V5_RESULTS.md), [`BFCL_V6_RESULTS.md`](BFCL_V6_RESULTS.md), and [`evaluation/bfcl-routing-pressure-v6-frozen.json`](evaluation/bfcl-routing-pressure-v6-frozen.json).
+
 ## Cross-benchmark evidence
 
 AgentWeave is evaluated across four independent public benchmark distributions — **AgentBench, ToolBench, AgencyBench, and AgentProcessBench** — covering specialist selection, tool/API retrieval, capability-family routing, and post-hoc process-quality verification.
