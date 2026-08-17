@@ -1,0 +1,33 @@
+{
+  "study_id": "bfcl-routing-pressure-v6",
+  "status": "frozen-after-first-successful-score",
+  "scored_head_sha": "ca6ff084da4fe5c670421b99e7ad413650e60c33",
+  "workflow_run_id": 31983991285,
+  "artifact_id": 9275082744,
+  "artifact_digest": "sha256:db9bcca4e7f0d83b6b837b23a0ddf8a5bcd43b24a5d66554156ba794dca48c0e",
+  "benchmark_commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "model": "MadeAgents/Hammer2.1-1.5b",
+  "sample_size": 48,
+  "v5_overlap_count": 0,
+  "augmented_tool_count": 16,
+  "agentweave_budget": {"max_provider_agents": 4, "max_tools": 6},
+  "results": {
+    "single-agent": {"successes": 0, "n": 48, "native_task_success": 0.0, "mean_original_candidate_recall": 1.0, "mean_tools_after": 16.0, "input_tokens": 124821, "mean_call_latency_seconds": 55.92130121310414},
+    "random-router": {"successes": 0, "n": 48, "native_task_success": 0.0, "mean_original_candidate_recall": 0.484375, "mean_tools_after": 8.0, "input_tokens": 69790, "mean_call_latency_seconds": 30.55668982414585},
+    "semantic-router": {"successes": 0, "n": 48, "native_task_success": 0.0, "mean_original_candidate_recall": 0.8680555555555555, "mean_tools_after": 8.0, "input_tokens": 70271, "mean_call_latency_seconds": 35.86756529608332},
+    "agentweave": {"successes": 6, "n": 48, "native_task_success": 0.125, "wilson_95_ci": [0.058570514385719794, 0.24700458286386834], "mean_original_candidate_recall": 0.7690972222222222, "all_original_candidates_retained_rate": 0.5416666666666666, "mean_tools_after": 4.770833333333333, "input_tokens": 47805, "mean_call_latency_seconds": 27.43061615410416}
+  },
+  "comparisons": {
+    "agentweave_vs_single_agent": {"difference_pp": 12.5, "paired_bootstrap_95_ci_pp": [4.166666666666666, 22.916666666666664], "exact_mcnemar_p": 0.03125},
+    "agentweave_vs_random_router": {"difference_pp": 12.5, "paired_bootstrap_95_ci_pp": [4.166666666666666, 22.916666666666664], "exact_mcnemar_p": 0.03125},
+    "agentweave_vs_semantic_router": {"difference_pp": 12.5, "paired_bootstrap_95_ci_pp": [4.166666666666666, 22.916666666666664], "exact_mcnemar_p": 0.03125}
+  },
+  "efficiency_vs_single_agent": {
+    "fewer_visible_tools_percent": 70.18229166666667,
+    "fewer_input_tokens_percent": 61.70115605547144,
+    "lower_mean_model_latency_percent": 50.94782210168547
+  },
+  "replication_interpretation": "V6 is a larger untouched replication of frozen V5. AgentWeave achieved 6/48 native BFCL successes while all three matched baselines achieved 0/48. The paired exact McNemar p-value is 0.03125 and the paired bootstrap 95% interval for the success-rate difference is +4.17 to +22.92 percentage points.",
+  "freeze_rule": "Do not alter or overwrite this v6 result. Any tuning, larger replication, model change, routing-budget change, sample change, or distractor change must use a new study id and a fresh untouched sample.",
+  "evidence_boundary": "BFCL-derived routing-pressure replication, not an official full BFCL leaderboard score. Untouched BFCL questions and native BFCL evaluation are retained, while model-visible tool context is deterministically augmented. V6 excludes every frozen V5 task, is keyless, local, single-turn, and has $0 external API spend."
+}
