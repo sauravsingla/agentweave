@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import importlib.util
 import os
+from pathlib import Path
 
 try:
     # Upstream Gorilla/BFCL location after submission.
     from bfcl_eval.model_handler.local_inference.agentweave_router import BFCLToolRouter
-except ImportError:  # Local AgentWeave compatibility-tree location.
-    from integrations.bfcl_upstream.agentweave_router import BFCLToolRouter
+except ImportError:  # Repository-local compatibility-tree location.
+    router_path = Path(__file__).with_name("agentweave_router.py")
+    spec = importlib.util.spec_from_file_location("agentweave_bfcl_router_local", router_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load AgentWeave BFCL router from {router_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    BFCLToolRouter = module.BFCLToolRouter
 
 from bfcl_eval.model_handler.local_inference.hammer import HammerHandler
 from overrides import override
