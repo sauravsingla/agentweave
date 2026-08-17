@@ -39,6 +39,23 @@ The AgentBench, ToolBench, and AgencyBench figures are **routing/selection metri
 
 The next research step is to connect selection and process verification in one benchmark-native loop: **task → candidate discovery → capability/trust ranking → selected agent/tool/team → execution → process verification/native judge → outcome-driven reputation update**.
 
+## Frozen BFCL routing-pressure replication
+
+AgentWeave also maintains a separate **BFCL-derived routing-pressure study** that preserves untouched BFCL questions and native BFCL evaluation while deterministically expanding the model-visible candidate-tool context. It is explicitly **not an official full BFCL leaderboard score**.
+
+The frozen v5 pilot and its larger untouched v6 replication used the same pinned BFCL/Gorilla commit, the same local keyless `MadeAgents/Hammer2.1-1.5b` model, the same 16-tool pressure, the same all-tools/random-top-8/semantic-top-8 baselines, and the same AgentWeave 4-provider / 6-tool budget. V6 excluded every frozen v5 task.
+
+| Study | Fresh tasks | AgentWeave | All-tools | Random top-8 | Semantic top-8 | Exact McNemar vs each baseline |
+|---|---:|---:|---:|---:|---:|---:|
+| **V5 pilot** | 12 | **2/12 = 16.67%** | 0/12 | 0/12 | 0/12 | `p = 0.5` |
+| **V6 replication** | 48 | **6/48 = 12.5%** | 0/48 | 0/48 | 0/48 | **`p = 0.03125`** |
+
+For v6, the paired AgentWeave advantage versus each matched baseline was **+12.5 percentage points**, with a **10,000-resample paired bootstrap 95% CI of +4.17 to +22.92 pp**. Against the all-tools baseline, AgentWeave exposed **70.18% fewer tools**, used **61.70% fewer input tokens**, and had **50.95% lower mean local-model latency**.
+
+The v6 replication therefore turns the directional v5 pilot into a larger untouched result that is statistically significant at the preregistered `alpha = 0.05` threshold for this study. The result remains bounded to this BFCL-derived routing-pressure setup and should not be generalized to the official BFCL leaderboard or all function-calling workloads.
+
+See [`BFCL_V5_RESULTS.md`](BFCL_V5_RESULTS.md), [`BFCL_V6_RESULTS.md`](BFCL_V6_RESULTS.md), [`evaluation/bfcl-routing-pressure-v5-frozen.json`](evaluation/bfcl-routing-pressure-v5-frozen.json), and [`evaluation/bfcl-routing-pressure-v6-frozen.json`](evaluation/bfcl-routing-pressure-v6-frozen.json) for the frozen evidence and reproducibility metadata.
+
 ## Frozen-router generalization and external holdouts
 
 To test whether routing improvements transfer beyond datasets already inspected during development, AgentWeave maintains a **frozen-router evaluation sequence**. Each router version is scored once on a newly preregistered external holdout; after the first successful scored run, that router/holdout pair is frozen. A later improvement must use a new router version and a new holdout rather than tuning against the prior test set.
@@ -630,12 +647,12 @@ A passing proof is evidence for the configured test runtime; it is not a formal 
 | Category | Status | Current use |
 |---|---|---|
 | **Real systems / real execution** | ✅ | public A2A services, upstream SDK agents, official TCK, PostgreSQL, Docker/runtime controls, and executable team-advantage workload handlers |
-| **External public benchmark data** | ✅ | AgentBench, ToolBench, AgencyBench, AgentProcessBench, General-AgentBench, GSM8K, HumanEval, InterCode NL2Bash, MBPP, TruthfulQA, OSWorld, CRUXEval, BrowserGym MiniWoB, WorkArena, VisualWebArena, WebArena, and AssistantBench holdouts |
-| **Synthetic benchmark data** | ✅ | generated populations, capabilities, trust, latency/cost, adversarial fixtures, AgentBench candidate-agent catalog, controlled ToolBench priors, fixed AgencyBench zero-shot capability-family metadata, and the controlled team-advantage agent catalog/failure plan |
+| **External public benchmark data** | ✅ | AgentBench, ToolBench, AgencyBench, AgentProcessBench, General-AgentBench, GSM8K, HumanEval, InterCode NL2Bash, MBPP, TruthfulQA, OSWorld, CRUXEval, BrowserGym MiniWoB, WorkArena, VisualWebArena, WebArena, AssistantBench holdouts, and BFCL questions used in the separately bounded routing-pressure studies |
+| **Synthetic benchmark data** | ✅ | generated populations, capabilities, trust, latency/cost, adversarial fixtures, AgentBench candidate-agent catalog, controlled ToolBench priors, fixed AgencyBench zero-shot capability-family metadata, controlled team-advantage agent catalog/failure plan, and deterministic BFCL distractor-tool augmentation |
 | **Supervised benchmark routing data** | ✅ | AgencyBench development/other-fold scenario labels used only to train the separately reported held-out and cross-validation routing analyses |
 | **Production / real-world agent traces** | ❌ not claimed | no private production-user corpus, billed cost traces, or human-rated production outcomes |
 
-The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, AgentProcessBench, and the frozen-router V2–V7 holdouts provide external published benchmark data, while some candidate/catalog priors remain controlled synthetic or fixed metadata. The team-advantage benchmark performs real executable handler invocation over a controlled synthetic agent catalog with injected failures. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels and frozen-router holdout family labels are withheld during prediction where specified and used only afterward for scoring.
+The 10K/100K/1M execution is real computation over synthetic records. AgentBench, ToolBench, AgencyBench, AgentProcessBench, BFCL-derived routing-pressure studies, and the frozen-router V2–V7 holdouts provide external published benchmark data, while some candidate/catalog priors and BFCL distractor context remain controlled synthetic or fixed metadata. The team-advantage benchmark performs real executable handler invocation over a controlled synthetic agent catalog with injected failures. Supervised AgencyBench results are separated from zero-shot routing so training labels are not conflated with blind-routing evidence; AgentProcessBench human step labels and frozen-router holdout family labels are withheld during prediction where specified and used only afterward for scoring.
 
 ## Getting started
 
