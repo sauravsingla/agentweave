@@ -1,0 +1,54 @@
+name: BFCL Routing Pressure Study
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+  HF_HOME: ${{ github.workspace }}/.hf-cache
+  TOKENIZERS_PARALLELISM: 'false'
+
+jobs:
+  bfcl-routing-pressure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - name: Install study dependencies
+        run: |
+          pip install -e .[dev]
+          pip install 'bfcl-eval==2025.12.17' 'transformers>=4.47,<6' 'sentence-transformers>=5.1,<6' torch soundfile
+      - name: Run protocol and utility tests
+        run: pytest -q tests/test_bfcl_native_live_study.py
+      - name: Fetch pinned BFCL source
+        run: |
+          git clone --filter=blob:none https://github.com/ShishirPatil/gorilla.git external-gorilla
+          cd external-gorilla
+          git checkout 6ea57973c7a6097fd7c5915698c54c17c5b1b6c8
+          test "$(git rev-parse HEAD)" = "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8"
+      - name: Verify frozen routing-pressure sample before model download
+        run: |
+          python scripts/bfcl_native_live_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-native-live-results \
+            --validate-only
+      - name: Run no-key BFCL routing-pressure study
+        run: |
+          python scripts/bfcl_native_live_study.py \
+            --bfcl-root external-gorilla/berkeley-function-call-leaderboard \
+            --output bfcl-native-live-results
+      - name: Upload BFCL routing-pressure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bfcl-routing-pressure-evidence
+          path: bfcl-native-live-results/

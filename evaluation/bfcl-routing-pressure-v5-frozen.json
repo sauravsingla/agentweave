@@ -1,0 +1,32 @@
+{
+  "study_id": "bfcl-routing-pressure-v5",
+  "status": "frozen-after-first-successful-score",
+  "scored_head_sha": "e73374a2ca80f6d0ac4ed387ac50497915ebde9d",
+  "workflow_run_id": 31981730530,
+  "artifact_id": 9273004440,
+  "artifact_digest": "sha256:d10c78ccf1d8575d9b242fbb2dd4d0d358af2cda90c40c0e764cd08a0676b759",
+  "benchmark_commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
+  "model": "MadeAgents/Hammer2.1-1.5b",
+  "sample_size": 12,
+  "augmented_tool_count": 16,
+  "agentweave_budget": {"max_provider_agents": 4, "max_tools": 6},
+  "results": {
+    "single-agent": {"successes": 0, "n": 12, "native_task_success": 0.0, "mean_original_candidate_recall": 1.0, "mean_tools_after": 16.0, "input_tokens": 30482, "mean_call_latency_seconds": 56.04385813716666},
+    "random-router": {"successes": 0, "n": 12, "native_task_success": 0.0, "mean_original_candidate_recall": 0.46527777777777773, "mean_tools_after": 8.0, "input_tokens": 16623, "mean_call_latency_seconds": 30.22037881383335},
+    "semantic-router": {"successes": 0, "n": 12, "native_task_success": 0.0, "mean_original_candidate_recall": 0.8472222222222222, "mean_tools_after": 8.0, "input_tokens": 17194, "mean_call_latency_seconds": 36.071879301249986},
+    "agentweave": {"successes": 2, "n": 12, "native_task_success": 0.16666666666666666, "wilson_95_ci": [0.04696514218385381, 0.4480308622529734], "mean_original_candidate_recall": 0.7708333333333334, "all_original_candidates_retained_rate": 0.6666666666666666, "mean_tools_after": 4.583333333333333, "input_tokens": 11189, "mean_call_latency_seconds": 25.261402219500003}
+  },
+  "comparisons": {
+    "agentweave_vs_single_agent": {"difference_pp": 16.666666666666664, "paired_bootstrap_95_ci_pp": [0.0, 41.66666666666667], "exact_mcnemar_p": 0.5},
+    "agentweave_vs_random_router": {"difference_pp": 16.666666666666664, "paired_bootstrap_95_ci_pp": [0.0, 41.66666666666667], "exact_mcnemar_p": 0.5},
+    "agentweave_vs_semantic_router": {"difference_pp": 16.666666666666664, "paired_bootstrap_95_ci_pp": [0.0, 41.66666666666667], "exact_mcnemar_p": 0.5}
+  },
+  "hypothesis_outcomes": {
+    "H1_candidate_recall_at_least_85_percent": "not_supported: 77.08%",
+    "H2_efficiency_vs_all_tools": "supported: 71.35% fewer visible tools, 63.29% fewer input tokens, 54.92% lower mean model latency",
+    "H3_native_success_no_worse_and_may_improve": "supported directionally: 16.67% vs 0%; pilot is not statistically significant (McNemar p=0.5)",
+    "H4_vs_random_routing": "supported on native success and candidate recall, with different tool budgets; interpret as pilot evidence"
+  },
+  "freeze_rule": "Do not alter or overwrite this v5 result. Any tuning, larger replication, model change, routing-budget change, sample change, or distractor change must use a new study id and fresh untouched sample.",
+  "evidence_boundary": "BFCL-derived routing-pressure stress test, not an official full BFCL leaderboard score. Untouched BFCL questions and native BFCL evaluation are retained, while model-visible tool context is deterministically augmented. Keyless, local, single-turn, $0 external API spend."
+}
