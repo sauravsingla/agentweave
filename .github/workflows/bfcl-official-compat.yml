@@ -3,7 +3,6 @@ name: BFCL Official Handler Compatibility
 on:
   pull_request:
     paths:
-      - 'agentweave/bfcl.py'
       - 'integrations/bfcl_upstream/**'
       - 'tests/test_bfcl_compatibility.py'
       - '.github/workflows/bfcl-official-compat.yml'
@@ -30,13 +29,7 @@ jobs:
       - name: Import upstream-ready BFCL handler
         run: |
           python - <<'PY'
-          import importlib.util
-          from pathlib import Path
-
-          path = Path('integrations/bfcl_upstream/agentweave_hammer.py')
-          spec = importlib.util.spec_from_file_location('agentweave_bfcl_upstream_handler', path)
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
-          assert module.AgentWeaveHammerHandler.__name__ == 'AgentWeaveHammerHandler'
+          from integrations.bfcl_upstream.agentweave_hammer import AgentWeaveHammerHandler
+          assert AgentWeaveHammerHandler.__name__ == 'AgentWeaveHammerHandler'
           print('BFCL upstream handler import: OK')
           PY
