@@ -1,8 +1,13 @@
 from __future__ import annotations
 
-import numpy as np
+import math
 
-from agentweave.bfcl import BFCLToolRouter
+from integrations.bfcl_upstream.agentweave_router import BFCLToolRouter
+
+
+class _Vector(list):
+    def __matmul__(self, other):
+        return sum(left * right for left, right in zip(self, other))
 
 
 class _FakeEmbeddingModel:
@@ -10,24 +15,20 @@ class _FakeEmbeddingModel:
         vectors = []
         for text in texts:
             text = text.lower()
-            vectors.append(
-                np.array(
-                    [
-                        1.0 if "weather" in text else 0.0,
-                        1.0 if "file" in text else 0.0,
-                        1.0 if "calendar" in text else 0.0,
-                        0.25,
-                    ],
-                    dtype=float,
-                )
+            vector = _Vector(
+                [
+                    1.0 if "weather" in text else 0.0,
+                    1.0 if "file" in text else 0.0,
+                    1.0 if "calendar" in text else 0.0,
+                    0.25,
+                ]
             )
-        if normalize_embeddings:
-            normalized = []
-            for vector in vectors:
-                norm = np.linalg.norm(vector)
-                normalized.append(vector / norm if norm else vector)
-            return np.stack(normalized)
-        return np.stack(vectors)
+            if normalize_embeddings:
+                norm = math.sqrt(sum(value * value for value in vector))
+                if norm:
+                    vector = _Vector(value / norm for value in vector)
+            vectors.append(vector)
+        return vectors
 
 
 def _fn(name: str, description: str):
