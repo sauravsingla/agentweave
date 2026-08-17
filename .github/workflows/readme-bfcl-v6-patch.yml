@@ -1,0 +1,59 @@
+name: Patch README with frozen BFCL v6
+
+on:
+  push:
+    branches:
+      - research/bfcl-routing-pressure-v6
+
+permissions:
+  contents: write
+
+jobs:
+  patch-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: research/bfcl-routing-pressure-v6
+          fetch-depth: 0
+      - name: Insert BFCL v5-v6 replication evidence
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('README.md')
+          text = p.read_text(encoding='utf-8')
+          marker = '## BFCL routing-pressure replication evidence'
+          if marker in text:
+              print('README already patched')
+              raise SystemExit(0)
+          anchor = '\n## Cross-benchmark evidence\n'
+          if anchor not in text:
+              raise SystemExit('README anchor not found')
+          section = r'''
+
+## BFCL routing-pressure replication evidence
+
+AgentWeave has two frozen, keyless **BFCL-derived routing-pressure** studies using untouched BFCL questions and native BFCL evaluation with deterministically augmented model-visible tool context. These are **not official full BFCL leaderboard scores**.
+
+| Frozen study | Tasks | AgentWeave native success | Single-agent | Random top-8 | Semantic top-8 | Mean tools shown | Input-token reduction vs all-tools | Latency reduction vs all-tools |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| **V5 pilot** | 12 | **2/12 (16.67%)** | 0/12 | 0/12 | 0/12 | **4.58** | **63.29%** | **54.92%** |
+| **V6 untouched replication** | 48 | **6/48 (12.5%)** | 0/48 | 0/48 | 0/48 | **4.77** | **61.70%** | **50.95%** |
+
+V6 excluded every V5 task (**zero overlap**) while keeping the same pinned BFCL source, local `MadeAgents/Hammer2.1-1.5b` model, 16-tool pressure, baselines, AgentWeave 4-provider/6-tool budget, generation settings, and evaluator. For V6, AgentWeave exceeded each matched baseline by **+12.5 percentage points**; exact paired McNemar **p = 0.03125**, with paired-bootstrap 95% CI **+4.17 to +22.92 pp**. Compared with all-tools, V6 used **70.18% fewer visible tools**, **61.70% fewer input tokens**, and **50.95% lower mean model latency**.
+
+Full frozen evidence: [`BFCL_V5_RESULTS.md`](BFCL_V5_RESULTS.md), [`BFCL_V6_RESULTS.md`](BFCL_V6_RESULTS.md), and [`evaluation/bfcl-routing-pressure-v6-frozen.json`](evaluation/bfcl-routing-pressure-v6-frozen.json).
+'''
+          p.write_text(text.replace(anchor, section + anchor, 1), encoding='utf-8')
+          PY
+      - name: Commit README if changed
+        run: |
+          if git diff --quiet -- README.md; then
+            echo 'No README change needed'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md
+          git commit -m 'Show frozen BFCL v5-v6 replication in README'
+          git push origin HEAD:research/bfcl-routing-pressure-v6
