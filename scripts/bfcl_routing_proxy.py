@@ -56,7 +56,7 @@ class Router:
         if self.strategy == "single-agent" or not tools: return tools
         query = _latest_user_text(messages)
         if self.strategy == "random-router":
-            order = sorted(range(len(tools)), key=lambda i: hashlib.sha256(("agentweave-bfcl-random-v4:" + query + "\n" + _tool_name(tools[i])).encode()).hexdigest())
+            order = sorted(range(len(tools)), key=lambda i: hashlib.sha256(("agentweave-bfcl-random-v5:" + query + "\n" + _tool_name(tools[i])).encode()).hexdigest())
             return [tools[i] for i in order[:self.semantic_top_k]]
         if self.strategy == "semantic-router":
             scores = self._similarities(query, [_tool_text(t) for t in tools])
@@ -103,8 +103,8 @@ def make_handler(router,metrics,upstream_url,upstream_model):
     return Handler
 
 def main():
-    ap=argparse.ArgumentParser(); ap.add_argument("--strategy",required=True); ap.add_argument("--port",type=int,required=True); ap.add_argument("--metrics",type=Path,required=True); args=ap.parse_args()
-    router=Router(args.strategy); metrics=Metrics(args.metrics); url=os.environ.get("LOCAL_MODEL_BASE_URL","http://127.0.0.1:9100/v1"); model=os.environ.get("LOCAL_MODEL_ID","MadeAgents/Hammer2.1-1.5b")
+    ap=argparse.ArgumentParser(); ap.add_argument("--strategy",required=True); ap.add_argument("--port",type=int,required=True); ap.add_argument("--metrics",type=Path,required=True); ap.add_argument("--max-agents",type=int,default=3); ap.add_argument("--max-tools",type=int,default=8); args=ap.parse_args()
+    router=Router(args.strategy,max_agents=args.max_agents,max_tools=args.max_tools); metrics=Metrics(args.metrics); url=os.environ.get("LOCAL_MODEL_BASE_URL","http://127.0.0.1:9100/v1"); model=os.environ.get("LOCAL_MODEL_ID","MadeAgents/Hammer2.1-1.5b")
     ThreadingHTTPServer(("127.0.0.1",args.port),make_handler(router,metrics,url,model)).serve_forever()
 
 if __name__=="__main__": main()
