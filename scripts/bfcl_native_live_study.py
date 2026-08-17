@@ -6,10 +6,12 @@ from pathlib import Path
 BFCL_HANDLER_MODEL_ID = "openbmb/MiniCPM-SALA-FC"
 LOCAL_MODEL_ID = "MadeAgents/Hammer2.1-1.5b"
 CATEGORY = "multiple"
-SAMPLE_SEED = "agentweave-bfcl-routing-pressure-v4:"
-DISTRACTOR_SEED = "agentweave-bfcl-distractors-v4:"
+SAMPLE_SEED = "agentweave-bfcl-routing-pressure-v5:"
+DISTRACTOR_SEED = "agentweave-bfcl-distractors-v5:"
 SAMPLE_SIZE = 12
 TARGET_TOOL_COUNT = 16
+AGENTWEAVE_MAX_AGENTS = 4
+AGENTWEAVE_MAX_TOOLS = 6
 STRATEGIES = ("single-agent", "random-router", "semantic-router", "agentweave")
 
 def load_jsonl(path): return [json.loads(x) for x in Path(path).read_text(encoding="utf-8").splitlines() if x.strip()]
@@ -77,7 +79,7 @@ def wait_http(url,timeout=300):
 def run_strategy(strategy,bfcl_root,output_root,sampled_ids,port,data_file,original_rows,augmented_rows):
     run_root=output_root/strategy;run_root.mkdir(parents=True,exist_ok=True);(run_root/"test_case_ids_to_generate.json").write_text(json.dumps({CATEGORY:sampled_ids},indent=2))
     metrics=run_root/"provider_metrics.jsonl";env=os.environ.copy();env["BFCL_PROJECT_ROOT"]=str(run_root.resolve());env["OPENAI_API_KEY"]="local-no-key-shim";env["OPENAI_BASE_URL"]=f"http://127.0.0.1:{port}/v1";env["LOCAL_MODEL_BASE_URL"]="http://127.0.0.1:9100/v1";env["LOCAL_MODEL_ID"]=LOCAL_MODEL_ID
-    proxy=subprocess.Popen([sys.executable,str((Path(__file__).parent/"bfcl_routing_proxy.py").resolve()),"--strategy",strategy,"--port",str(port),"--metrics",str(metrics.resolve())],env=env)
+    proxy=subprocess.Popen([sys.executable,str((Path(__file__).parent/"bfcl_routing_proxy.py").resolve()),"--strategy",strategy,"--port",str(port),"--metrics",str(metrics.resolve()),"--max-agents",str(AGENTWEAVE_MAX_AGENTS),"--max-tools",str(AGENTWEAVE_MAX_TOOLS)],env=env)
     try:
         wait_http(f"http://127.0.0.1:{port}/v1/models",30)
         try:
@@ -94,17 +96,17 @@ def routing_diagnostics(original_rows,augmented_rows,sampled_ids):
     from scripts.bfcl_routing_proxy import Router,_tool_name
     original={r["id"]:r for r in original_rows if r.get("id") in sampled_ids}; augmented={r["id"]:r for r in augmented_rows if r.get("id") in sampled_ids};out={}
     for s in STRATEGIES:
-        router=Router(s); cover=[]; selected_counts=[]
+        router=Router(s,max_agents=AGENTWEAVE_MAX_AGENTS,max_tools=AGENTWEAVE_MAX_TOOLS); cover=[]; selected_counts=[]
         for tid in sampled_ids:
             row=augmented[tid];q=row.get("question") or [];messages=q[0] if q and isinstance(q[0],list) else q;tools=[{"type":"function","function":fn} for fn in row.get("function") or []];chosen=router.select(messages,tools);chosen_names={_tool_name(t) for t in chosen};orig_names={tool_name(fn) for fn in original[tid].get("function") or []};cover.append(len(orig_names&chosen_names)/len(orig_names) if orig_names else 1.0);selected_counts.append(len(chosen))
         out[s]={"mean_original_candidate_recall":statistics.fmean(cover),"all_original_candidates_retained_rate":statistics.fmean(1.0 if x==1.0 else 0.0 for x in cover),"mean_selected_tools_pre_inference":statistics.fmean(selected_counts)}
     return out
 def main():
     ap=argparse.ArgumentParser();ap.add_argument("--bfcl-root",type=Path,required=True);ap.add_argument("--output",type=Path,default=Path("bfcl-native-live-results"));ap.add_argument("--protocol",type=Path,default=Path("evaluation/bfcl-native-live-v1.json"));ap.add_argument("--validate-only",action="store_true");args=ap.parse_args()
-    protocol=json.loads(args.protocol.read_text());assert protocol["benchmark"]["commit"]=="6ea57973c7a6097fd7c5915698c54c17c5b1b6c8";assert protocol["benchmark"]["category"]==CATEGORY;assert protocol["benchmark"]["sample_size"]==SAMPLE_SIZE;assert protocol["benchmark"]["augmented_tool_count"]==TARGET_TOOL_COUNT;assert protocol["inference"]["model"]==LOCAL_MODEL_ID;assert protocol["status"]=="preregistered-before-first-score"
+    protocol=json.loads(args.protocol.read_text());assert protocol["benchmark"]["commit"]=="6ea57973c7a6097fd7c5915698c54c17c5b1b6c8";assert protocol["benchmark"]["category"]==CATEGORY;assert protocol["benchmark"]["sample_size"]==SAMPLE_SIZE;assert protocol["benchmark"]["augmented_tool_count"]==TARGET_TOOL_COUNT;assert protocol["inference"]["model"]==LOCAL_MODEL_ID;assert protocol["strategies"]["agentweave"]["max_provider_agents"]==AGENTWEAVE_MAX_AGENTS;assert protocol["strategies"]["agentweave"]["max_tools"]==AGENTWEAVE_MAX_TOOLS;assert protocol["status"]=="preregistered-before-first-score"
     data=args.bfcl_root/"bfcl_eval"/"data"/f"BFCL_v4_{CATEGORY}.json";ids=select_ids(data);original_rows=load_jsonl(data);augmented_rows,manifest=augment_rows(original_rows,ids);args.output.mkdir(parents=True,exist_ok=True);(args.output/"sampled_ids.json").write_text(json.dumps(ids,indent=2));(args.output/"augmentation_manifest.json").write_text(json.dumps(manifest,indent=2,sort_keys=True))
     if args.validate_only:
-        counts=[len(manifest[i]["augmented_tools"]) for i in ids];print(json.dumps({"protocol_valid":True,"study_id":protocol["study_id"],"category":CATEGORY,"sample_count":len(ids),"sample_sha256":hashlib.sha256("\n".join(ids).encode()).hexdigest(),"augmented_tool_count_min":min(counts),"augmented_tool_count_mean":statistics.fmean(counts),"local_model":LOCAL_MODEL_ID},indent=2));return
+        counts=[len(manifest[i]["augmented_tools"]) for i in ids];print(json.dumps({"protocol_valid":True,"study_id":protocol["study_id"],"category":CATEGORY,"sample_count":len(ids),"sample_sha256":hashlib.sha256("\n".join(ids).encode()).hexdigest(),"augmented_tool_count_min":min(counts),"augmented_tool_count_mean":statistics.fmean(counts),"agentweave_max_tools":AGENTWEAVE_MAX_TOOLS,"local_model":LOCAL_MODEL_ID},indent=2));return
     env=os.environ.copy();env["LOCAL_MODEL_ID"]=LOCAL_MODEL_ID;model_server=subprocess.Popen([sys.executable,str((Path(__file__).parent/"bfcl_local_hammer_server.py").resolve()),"--port","9100"],env=env)
     try:
         wait_http("http://127.0.0.1:9100/v1/models",900);score_maps={};metrics={}
