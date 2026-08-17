@@ -1,19 +1,19 @@
 {
-  "study_id": "bfcl-routing-pressure-v5",
+  "study_id": "bfcl-routing-pressure-v6",
   "status": "preregistered-before-first-score",
-  "supersedes_study": "bfcl-routing-pressure-v4",
-  "supersession_reason": "V4 completed with 0/12 native success for every strategy, while AgentWeave reduced visible tools from 16 to 3.58, input tokens by about 67%, and mean latency by about 54%, but retained only 70.1% of original BFCL candidates. V5 is a new untouched study that relaxes only the preregistered AgentWeave routing budget to target higher candidate retention while preserving meaningful compression. V4 remains immutable evidence in CI artifact history.",
-  "frozen_agentweave_commit": "a33e793aad02ad5da713957faa77bb82d5673e76",
+  "supersedes_study": "bfcl-routing-pressure-v5",
+  "supersession_reason": "V5 is frozen as a positive pilot: AgentWeave achieved 2/12 native BFCL successes while all three matched baselines achieved 0/12, together with substantial tool, token, and latency reductions, but the success difference was not statistically significant. V6 is a larger untouched replication with the same model, routing budgets, baselines, tool pressure, and generation settings. Only the sample and distractor seeds change, and all 12 scored V5 task ids are explicitly excluded.",
+  "frozen_v5_evidence": "evaluation/bfcl-routing-pressure-v5-frozen.json",
   "benchmark": {
-    "name": "Berkeley Function Calling Leaderboard V4 routing-pressure stress test",
+    "name": "Berkeley Function Calling Leaderboard V4 routing-pressure replication",
     "repository": "ShishirPatil/gorilla",
     "commit": "6ea57973c7a6097fd7c5915698c54c17c5b1b6c8",
     "category": "multiple",
     "native_metric": "BFCL single-turn AST/function-call validity against the restored original BFCL evaluator data",
-    "sample_size": 12,
+    "sample_size": 48,
     "augmented_tool_count": 16,
-    "sample_rule": "Take the 12 task ids with the smallest SHA256('agentweave-bfcl-routing-pressure-v5:' + id) digest from BFCL_v4_multiple.json. No task-content or outcome filtering is permitted.",
-    "augmentation_rule": "For each sampled task, retain every original BFCL candidate function and append unique distractor functions from the same pinned BFCL_v4_multiple.json, ordered by SHA256('agentweave-bfcl-distractors-v5:' + task_id + ':' + function_name), until 16 model-visible functions are present. Restore original BFCL data before native evaluation."
+    "sample_rule": "Exclude the 12 frozen V5 task ids, then take the 48 remaining task ids with the smallest SHA256('agentweave-bfcl-routing-pressure-v6:' + id) digest from BFCL_v4_multiple.json. No task-content or outcome filtering is permitted.",
+    "augmentation_rule": "For each sampled task, retain every original BFCL candidate function and append unique distractor functions from the same pinned BFCL_v4_multiple.json, ordered by SHA256('agentweave-bfcl-distractors-v6:' + task_id + ':' + function_name), until 16 model-visible functions are present. Restore original BFCL data before native evaluation."
   },
   "inference": {
     "mode": "self-hosted CPU",
@@ -26,30 +26,41 @@
   },
   "strategies": {
     "single-agent": {"description": "Same local model receives all 16 model-visible candidate functions."},
-    "random-router": {"description": "Deterministic content-independent top-8 control using SHA256 ordering.", "top_k_tools": 8},
+    "random-router": {"description": "Deterministic content-independent top-8 control using the frozen routing implementation from V5.", "top_k_tools": 8},
     "semantic-router": {"description": "Zero-shot MiniLM cosine-similarity top-8 router.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "top_k_tools": 8},
     "agentweave": {"description": "MiniLM scores tool-provider groups and AgentWeave GlobalTeamOptimizer selects up to four provider agents, capped at six tools.", "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "max_provider_agents": 4, "max_tools": 6}
   },
   "primary_hypotheses": [
-    "H1: AgentWeave retains at least 85% mean original BFCL candidate recall while exposing substantially fewer than 16 tools.",
-    "H2: AgentWeave reduces input tokens and local inference latency relative to the all-tools single-agent baseline.",
-    "H3: AgentWeave BFCL native task success is no worse than the all-tools baseline and may improve under reduced distractor pressure.",
-    "H4: AgentWeave routing quality exceeds the deterministic random control at a comparable compression regime."
+    "H1: The V5 directional native-success advantage replicates: AgentWeave native BFCL task success exceeds the all-tools single-agent baseline on the fresh V6 sample.",
+    "H2: AgentWeave native BFCL task success exceeds the deterministic random top-8 baseline on the fresh V6 sample.",
+    "H3: AgentWeave native BFCL task success exceeds the semantic top-8 baseline on the fresh V6 sample.",
+    "H4: AgentWeave materially reduces model-visible tools, input tokens, and local inference latency relative to the all-tools baseline while preserving useful original-candidate recall."
   ],
   "statistics": {
     "success_interval": "Wilson 95% confidence interval",
     "paired_success_test": "exact McNemar test",
     "paired_effect_interval": "10,000-resample paired bootstrap 95% confidence interval",
     "alpha": 0.05,
-    "power_note": "n=12 is a resource-constrained pilot; significance is reported exactly and low power must be acknowledged."
+    "power_note": "n=48 is a larger confirmatory replication than the n=12 V5 pilot, but still a resource-constrained study. Statistical significance and confidence intervals are reported without post-score tuning."
   },
-  "measurements": ["BFCL native per-task success", "original BFCL candidate recall after routing", "all-original-candidates-retained rate", "model-visible tools", "local wall-clock model latency", "input/output tokens", "external API spend ($0)", "all BFCL failure/error records"],
-  "anti_tuning_rules": [
-    "V4 scored results justify the existence of V5 but do not determine V5 task contents; V5 uses a fresh content-blind hash sample and fresh distractor seed.",
-    "V5 sample, distractor seed, 16-tool pressure, AgentWeave four-agent/six-tool budget, baselines, model, hypotheses, and generation settings do not change after the first V5 score.",
-    "All distractors come from the same pinned BFCL category using a content-independent hash rule.",
-    "Original BFCL data is restored before evaluation so augmentation changes model-visible context, not evaluator ground truth.",
-    "Any post-score modification requires a new study id and untouched sample."
+  "measurements": [
+    "BFCL native per-task success",
+    "original BFCL candidate recall after routing",
+    "all-original-candidates-retained rate",
+    "model-visible tools",
+    "local wall-clock model latency",
+    "input/output tokens",
+    "external API spend ($0)",
+    "all BFCL failure/error records",
+    "explicit V5/V6 task overlap count"
   ],
-  "evidence_boundary": "This is a BFCL-derived routing-pressure stress test, not an official full BFCL leaderboard score. It preserves untouched BFCL questions and native BFCL evaluation but deterministically augments model-visible tool context. It is keyless, local, single-turn, and has $0 external API spend."
+  "anti_tuning_rules": [
+    "The frozen V5 result is not altered or rescored.",
+    "All 12 frozen V5 scored task ids are excluded before V6 sampling, guaranteeing zero V5/V6 task overlap.",
+    "V6 keeps the V5 model, 16-tool pressure, four-agent/six-tool AgentWeave budget, all three baselines, temperature, and max generation length unchanged.",
+    "V6 uses a fresh content-blind sample seed and fresh content-independent BFCL distractor seed.",
+    "Original BFCL data is restored before evaluation so augmentation changes model-visible context, not evaluator ground truth.",
+    "Any modification after the first V6 score requires a new study id and a new untouched sample."
+  ],
+  "evidence_boundary": "This is a BFCL-derived routing-pressure replication, not an official full BFCL leaderboard score. It preserves untouched BFCL questions and native BFCL evaluation but deterministically augments model-visible tool context. V6 is keyless, local, single-turn, has $0 external API spend, and excludes every task used in the frozen V5 pilot."
 }
