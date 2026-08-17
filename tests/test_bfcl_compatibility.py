@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import importlib.util
 import math
+from pathlib import Path
 
-from integrations.bfcl_upstream.agentweave_router import BFCLToolRouter
+
+_ROUTER_PATH = Path(__file__).resolve().parents[1] / "integrations" / "bfcl_upstream" / "agentweave_router.py"
+_spec = importlib.util.spec_from_file_location("agentweave_bfcl_router_test", _ROUTER_PATH)
+assert _spec is not None and _spec.loader is not None
+_module = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_module)
+BFCLToolRouter = _module.BFCLToolRouter
 
 
 class _Vector(list):
