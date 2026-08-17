@@ -40,7 +40,7 @@ The upstream-ready handler and router are in:
 - `integrations/bfcl_upstream/agentweave_hammer.py`
 - `integrations/bfcl_upstream/agentweave_router.py`
 
-They intentionally live outside `agentweave/` so existing preregistered frozen-router studies remain byte-for-byte protected by their original anti-tuning scope.
+They intentionally live outside `agentweave/`. This preserves the original preregistered anti-tuning rule for historical frozen-router studies, which treats any change under `agentweave/` as a protocol violation. No historical manifest, frozen benchmark artifact, or scored result is changed by this integration.
 
 ## Proposed BFCL model identity
 
