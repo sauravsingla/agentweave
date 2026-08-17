@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import os
 
-from agentweave.bfcl import BFCLToolRouter
+try:
+    # Upstream Gorilla/BFCL location after submission.
+    from bfcl_eval.model_handler.local_inference.agentweave_router import BFCLToolRouter
+except ImportError:  # Local AgentWeave compatibility-tree location.
+    from integrations.bfcl_upstream.agentweave_router import BFCLToolRouter
+
 from bfcl_eval.model_handler.local_inference.hammer import HammerHandler
 from overrides import override
 
