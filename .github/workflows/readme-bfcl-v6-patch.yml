@@ -17,8 +17,11 @@ jobs:
           ref: research/bfcl-routing-pressure-v6
           fetch-depth: 0
       - name: Insert BFCL v5-v6 replication evidence
+        env:
+          SECTION_B64: CgojIyBCRkNMIHJvdXRpbmctcHJlc3N1cmUgcmVwbGljYXRpb24gZXZpZGVuY2UKCkFnZW50V2VhdmUgaGFzIHR3byBmcm96ZW4sIGtleWxlc3MgKipCRkNMLWRlcml2ZWQgcm91dGluZy1wcmVzc3VyZSoqIHN0dWRpZXMgdXNpbmcgdW50b3VjaGVkIEJGQ0wgcXVlc3Rpb25zIGFuZCBuYXRpdmUgQkZDTCBldmFsdWF0aW9uIHdpdGggZGV0ZXJtaW5pc3RpY2FsbHkgYXVnbWVudGVkIG1vZGVsLXZpc2libGUgdG9vbCBjb250ZXh0LiBUaGVzZSBhcmUgKipub3Qgb2ZmaWNpYWwgZnVsbCBCRkNMIGxlYWRlcmJvYXJkIHNjb3JlcyoqLgoKfCBGcm96ZW4gc3R1ZHkgfCBUYXNrcyB8IEFnZW50V2VhdmUgbmF0aXZlIHN1Y2Nlc3MgfCBTaW5nbGUtYWdlbnQgfCBSYW5kb20gdG9wLTggfCBTZW1hbnRpYyB0b3AtOCB8IE1lYW4gdG9vbHMgc2hvd24gfCBJbnB1dC10b2tlbiByZWR1Y3Rpb24gdnMgYWxsLXRvb2xzIHwgTGF0ZW5jeSByZWR1Y3Rpb24gdnMgYWxsLXRvb2xzIHwKfC0tLXwtLS06fC0tLTp8LS0tOnwtLS06fC0tLTp8LS0tOnwtLS06fC0tLTp8CnwgKipWNSBwaWxvdCoqIHwgMTIgfCAqKjIvMTIgKDE2LjY3JSkqKiB8IDAvMTIgfCAwLzEyIHwgMC8xMiB8ICoqNC41OCoqIHwgKio2My4yOSUqKiB8ICoqNTQuOTIlKiogfAp8ICoqVjYgdW50b3VjaGVkIHJlcGxpY2F0aW9uKiogfCA0OCB8ICoqNi80OCAoMTIuNSUpKiogfCAwLzQ4IHwgMC80OCB8IDAvNDggfCAqKjQuNzcqKiB8ICoqNjEuNzAlKiogfCAqKjUwLjk1JSoqIHwKClY2IGV4Y2x1ZGVkIGV2ZXJ5IFY1IHRhc2sgKCoqemVybyBvdmVybGFwKiopIHdoaWxlIGtlZXBpbmcgdGhlIHNhbWUgcGlubmVkIEJGQ0wgc291cmNlLCBsb2NhbCBgTWFkZUFnZW50cy9IYW1tZXIyLjEtMS41YmAgbW9kZWwsIDE2LXRvb2wgcHJlc3N1cmUsIGJhc2VsaW5lcywgQWdlbnRXZWF2ZSA0LXByb3ZpZGVyLzYtdG9vbCBidWRnZXQsIGdlbmVyYXRpb24gc2V0dGluZ3MsIGFuZCBldmFsdWF0b3IuIEZvciBWNiwgQWdlbnRXZWF2ZSBleGNlZWRlZCBlYWNoIG1hdGNoZWQgYmFzZWxpbmUgYnkgKiorMTIuNSBwZXJjZW50YWdlIHBvaW50cyoqOyBleGFjdCBwYWlyZWQgTWNOZW1hciAqKnAgPSAwLjAzMTI1KiosIHdpdGggcGFpcmVkLWJvb3RzdHJhcCA5NSUgQ0kgKiorNC4xNyB0byArMjIuOTIgcHAqKi4gQ29tcGFyZWQgd2l0aCBhbGwtdG9vbHMsIFY2IHVzZWQgKio3MC4xOCUgZmV3ZXIgdmlzaWJsZSB0b29scyoqLCAqKjYxLjcwJSBmZXdlciBpbnB1dCB0b2tlbnMqKiwgYW5kICoqNTAuOTUlIGxvd2VyIG1lYW4gbW9kZWwgbGF0ZW5jeSoqLgoKRnVsbCBmcm96ZW4gZXZpZGVuY2U6IFtgQkZDTF9WNV9SRVNVTFRTLm1kYF0oQkZDTF9WNV9SRVNVTFRTLm1kKSwgW2BCRkNMX1Y2X1JFU1VMVFMubWRgXShCRkNMX1Y2X1JFU1VMVFMubWQpLCBhbmQgW2BldmFsdWF0aW9uL2JmY2wtcm91dGluZy1wcmVzc3VyZS12Ni1mcm96ZW4uanNvbmBdKGV2YWx1YXRpb24vYmZjbC1yb3V0aW5nLXByZXNzdXJlLXY2LWZyb3plbi5qc29uKS4K
         run: |
           python - <<'PY'
+          import base64, os
           from pathlib import Path
           p = Path('README.md')
           text = p.read_text(encoding='utf-8')
@@ -29,21 +32,7 @@ jobs:
           anchor = '\n## Cross-benchmark evidence\n'
           if anchor not in text:
               raise SystemExit('README anchor not found')
-          section = r'''
-
-## BFCL routing-pressure replication evidence
-
-AgentWeave has two frozen, keyless **BFCL-derived routing-pressure** studies using untouched BFCL questions and native BFCL evaluation with deterministically augmented model-visible tool context. These are **not official full BFCL leaderboard scores**.
-
-| Frozen study | Tasks | AgentWeave native success | Single-agent | Random top-8 | Semantic top-8 | Mean tools shown | Input-token reduction vs all-tools | Latency reduction vs all-tools |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|
-| **V5 pilot** | 12 | **2/12 (16.67%)** | 0/12 | 0/12 | 0/12 | **4.58** | **63.29%** | **54.92%** |
-| **V6 untouched replication** | 48 | **6/48 (12.5%)** | 0/48 | 0/48 | 0/48 | **4.77** | **61.70%** | **50.95%** |
-
-V6 excluded every V5 task (**zero overlap**) while keeping the same pinned BFCL source, local `MadeAgents/Hammer2.1-1.5b` model, 16-tool pressure, baselines, AgentWeave 4-provider/6-tool budget, generation settings, and evaluator. For V6, AgentWeave exceeded each matched baseline by **+12.5 percentage points**; exact paired McNemar **p = 0.03125**, with paired-bootstrap 95% CI **+4.17 to +22.92 pp**. Compared with all-tools, V6 used **70.18% fewer visible tools**, **61.70% fewer input tokens**, and **50.95% lower mean model latency**.
-
-Full frozen evidence: [`BFCL_V5_RESULTS.md`](BFCL_V5_RESULTS.md), [`BFCL_V6_RESULTS.md`](BFCL_V6_RESULTS.md), and [`evaluation/bfcl-routing-pressure-v6-frozen.json`](evaluation/bfcl-routing-pressure-v6-frozen.json).
-'''
+          section = base64.b64decode(os.environ['SECTION_B64']).decode('utf-8')
           p.write_text(text.replace(anchor, section + anchor, 1), encoding='utf-8')
           PY
       - name: Commit README if changed
