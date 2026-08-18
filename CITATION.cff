@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: AgentWeave
-message: If you use AgentWeave in research, please cite this repository and the release version used.
+message: If you use AgentWeave in research, please cite this repository and the release version used. A research preprint describing the routing methodology and BFCL-derived studies is in preparation.
 type: software
 authors:
   - family-names: Singla
@@ -15,3 +15,6 @@ keywords:
   - agent interoperability
   - agent orchestration
   - trustworthy AI
+  - function calling
+  - tool routing
+  - BFCL
