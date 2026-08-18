@@ -178,6 +178,26 @@ uv run ./run_tck.py --sut-host http://127.0.0.1:9998 --transport jsonrpc --level
 
 See [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md) for the tested compatibility boundary and SDK version policy.
 
+## Paper
+
+A research preprint is in preparation under the working title:
+
+**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich LLM Agents**
+
+The manuscript is intended to document the routing problem, AgentWeave's pre-inference selection methodology, frozen experiments and statistical analysis, limitations, reproducibility controls, and the path toward standard BFCL evaluation. It will explicitly separate BFCL-derived routing-pressure evidence from any future official BFCL leaderboard result.
+
+Planned coverage includes:
+
+- capability/provider-aware pre-inference routing and bounded model-visible tool sets;
+- controlled same-model comparisons that isolate orchestration effects from model scaling;
+- frozen BFCL-derived routing-pressure studies and paired statistical analysis;
+- efficiency measurements including model-visible tools, input tokens, and latency;
+- failure analysis, including missing-tool, schema-competition, and multi-function completeness failures;
+- evidence boundaries, limitations, and independent-reproduction requirements;
+- BFCL-compatible integration for standard benchmark-native evaluation.
+
+**Status:** manuscript in preparation; no arXiv identifier or DOI is claimed yet. Until a preprint is published, research users should cite the software release using [`CITATION.cff`](CITATION.cff). Once an archival paper is available, this section and the citation metadata will be updated with the canonical paper identifier.
+
 ## Research and benchmark evidence
 
 AgentWeave separates **routing/selection evidence**, **process-verification evidence**, **controlled executable outcomes**, and **BFCL-derived native function-calling evidence** rather than presenting unlike measurements as a single leaderboard.
