@@ -1,13 +1,15 @@
-# AgentWeave
+# AgentWeave — Tool Routing and Multi-Agent Orchestration for Function-Calling AI
 
 [![CI](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml)
 [![A2A SDK Interop](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml)
 [![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
 [![Paper Quality](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml)
 
-**Knowledge-, capability-, trust-, policy-, and confidence-aware orchestration for heterogeneous AI agents.**
+**AgentWeave by Saurav Singla — pre-inference tool routing, function calling, A2A interoperability, and trustworthy orchestration for heterogeneous AI agents.**
 
-AgentWeave is an open-source framework for discovering, validating, selecting, and orchestrating AI agents across cloud, marketplaces, enterprise environments, and edge devices. It uses **A2A as the interoperability layer** and adds requirement intelligence, contextual trust, capability and knowledge reasoning, placement and team optimization, governance, result verification, reputation learning, observability, automatic runtime failover, and durable workflow recovery.
+AgentWeave is an open-source framework for **tool routing, function-calling systems, and multi-agent orchestration** across cloud, marketplaces, enterprise environments, and edge devices. For tool-rich LLM agents, AgentWeave can construct a smaller model-visible action space before inference through deterministic provider and capability routing, while keeping the underlying function-calling model unchanged. It uses **A2A as the interoperability layer** and adds requirement intelligence, contextual trust, capability and knowledge reasoning, placement and team optimization, governance, result verification, reputation learning, observability, automatic runtime failover, and durable workflow recovery.
+
+For function-calling research, the repository includes reproducible **BFCL-derived routing-pressure studies** and a BFCL-compatible integration path. Those experiments are explicitly separated from any future official BFCL leaderboard result.
 
 > **A2A answers:** how can agents communicate?
 >
