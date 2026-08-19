@@ -36,7 +36,7 @@ agentweave-a2a-sut = "agentweave.a2a_server:main"
 [project.entry-points."agentweave.plugins"]
 
 [tool.setuptools.packages.find]
-include = ["agentweave*"]
+include = ["agentweave*", "agentweave_byom*"]
 exclude = ["cpp*", "tests*", "examples*", "benchmarks*", "research*"]
 
 [tool.pytest.ini_options]
