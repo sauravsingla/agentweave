@@ -1,6 +1,6 @@
 import pytest
 
-from agentweave import BYOMAgentWeave, CallableModelAdapter, ToolRouter
+from agentweave_byom import BYOMAgentWeave, CallableModelAdapter, ToolRouter
 
 
 def _tools():
