@@ -2,6 +2,8 @@
 
 AgentWeave is a routing and orchestration layer, not a model. The BYOM path lets an application keep its preferred model provider while AgentWeave reduces the model-visible tool set before inference.
 
+To preserve the repository's frozen research-core integrity checks, BYOM is packaged as the companion `agentweave_byom` module while reusing the normal AgentWeave orchestration components.
+
 ```text
 user task
    ↓
@@ -21,7 +23,7 @@ normal tool/function call handling
 Wrap any synchronous or asynchronous provider SDK with `CallableModelAdapter`:
 
 ```python
-from agentweave import BYOMAgentWeave, CallableModelAdapter
+from agentweave_byom import BYOMAgentWeave, CallableModelAdapter
 
 async def call_my_model(*, messages, tools, **kwargs):
     # Call Anthropic, Gemini, a private gateway, Hugging Face,
@@ -36,14 +38,14 @@ weave = BYOMAgentWeave(
 result = await weave.run("Find the latest invoice", max_tools=6)
 ```
 
-AgentWeave routes first and sends only `result["selected_tools"]` to the user model.
+AgentWeave routes first and sends only the selected tool subset to the user model.
 
 ## OpenAI-compatible endpoints
 
 For OpenAI-shaped `/chat/completions` APIs, use the built-in adapter:
 
 ```python
-from agentweave import BYOMAgentWeave, OpenAICompatibleModelAdapter
+from agentweave_byom import BYOMAgentWeave, OpenAICompatibleModelAdapter
 
 model = OpenAICompatibleModelAdapter(
     model="my-model",
@@ -83,6 +85,6 @@ This makes it possible to distinguish a tool that the model saw but did not call
 
 ## Important research boundary
 
-BYOM is a general product/runtime feature. It does **not** alter historical frozen research evidence. Existing BFCL-derived routing-pressure studies remain pinned to their original model, protocol, sample, router configuration, artifacts, and canonical scored runs.
+BYOM is a general product/runtime feature. It does **not** alter historical frozen research evidence. The frozen `agentweave/` core remains unchanged by this feature. Existing BFCL-derived routing-pressure studies remain pinned to their original model, protocol, sample, router configuration, artifacts, and canonical scored runs.
 
 Using another model creates a new runtime configuration; it must not be presented as reproducing a frozen BFCL result unless a new study is explicitly defined and evaluated.
