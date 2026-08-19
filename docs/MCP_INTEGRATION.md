@@ -50,7 +50,7 @@ The selected descriptors are returned unchanged, so the router does not rewrite 
 
 ## Provenance
 
-For production use, pair this pattern with the routing-provenance design tracked in [Issue #22](../issues/22): record the source catalog identity, routing policy/version/configuration, selected model-visible tool set, resulting tool call, and execution result.
+For production use, pair this pattern with the routing-provenance design tracked in [Issue #22](https://github.com/sauravsingla/agentweave/issues/22): record the source catalog identity, routing policy/version/configuration, selected model-visible tool set, resulting tool call, and execution result.
 
 The goal is to make it possible to distinguish between a tool that was available but not chosen by the model and a tool that was filtered out before inference.
 
