@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from agentweave import BYOMAgentWeave, CallableModelAdapter
+from agentweave_byom import BYOMAgentWeave, CallableModelAdapter
 
 TOOLS = [
     {
