@@ -31,6 +31,9 @@ from .recovery import RuntimeRecoveryManager, RecoveryEvent
 from .workflow import WorkflowStep, WorkflowCheckpoint, DurableWorkflowEngine
 from .orchestrator import AgentWeave
 from .durable import DurableAgentWeave
+from .model_adapters import ModelAdapter, CallableModelAdapter, OpenAICompatibleModelAdapter
+from .tool_routing import ToolRouter, ToolRoutingResult
+from .byom import BYOMAgentWeave
 
 __version__ = '0.6.0'
 __all__=[name for name in globals() if not name.startswith('_')]
