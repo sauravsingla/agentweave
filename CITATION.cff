@@ -1,11 +1,12 @@
 cff-version: 1.2.0
 title: AgentWeave
-message: If you use AgentWeave in research, please cite this repository and the release version used. A research preprint describing the routing methodology and BFCL-derived studies is in preparation.
+message: If you use AgentWeave in research, please cite the AgentWeave arXiv paper and the software release version used.
 type: software
 authors:
   - family-names: Singla
     given-names: Saurav
 repository-code: https://github.com/sauravsingla/agentweave
+url: https://arxiv.org/abs/2608.23078
 license: Apache-2.0
 version: 0.6.0
 date-released: 2026-08-15
@@ -18,3 +19,21 @@ keywords:
   - function calling
   - tool routing
   - BFCL
+references:
+  - type: article
+    title: "AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models"
+    authors:
+      - family-names: Singla
+        given-names: Saurav
+      - family-names: Singla
+        given-names: Aarav
+      - family-names: Gupta
+        given-names: Advik
+      - family-names: Gupta
+        given-names: Parnika
+    year: 2026
+    repository: arXiv
+    identifiers:
+      - type: other
+        value: arXiv:2608.23078
+    url: https://arxiv.org/abs/2608.23078
