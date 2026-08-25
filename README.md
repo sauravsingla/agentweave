@@ -5,8 +5,6 @@
 [![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
 [![Paper Quality](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml)
 
-**Paper:** [AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models](https://arxiv.org/abs/2608.23078) — arXiv:2608.23078
-
 AgentWeave is an open-source routing and reliability layer for tool-rich and multi-agent systems. It reduces the tool or agent set exposed to a model before inference, while keeping policy, provenance, recovery, and downstream execution explicit.
 
 ```text
@@ -235,6 +233,11 @@ Synthetic scalability runs extend to **1,000,000 agents**. Negative measurements
 External reproductions, interoperability reports, integrations, benchmark scenarios, security tests, and documentation improvements are welcome.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`CHANGELOG.md`](CHANGELOG.md), and [`CITATION.cff`](CITATION.cff).
+
+## Paper
+
+**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**  
+[arXiv:2608.23078](https://arxiv.org/abs/2608.23078) · [`PAPER.md`](PAPER.md)
 
 ## License
 
