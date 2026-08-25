@@ -7,9 +7,7 @@
 
 **Paper:** [AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models](https://arxiv.org/abs/2608.23078) — arXiv:2608.23078
 
-**AgentWeave reduces the tool/agent set before inference so a model sees a smaller, more relevant action space — without changing the underlying model.**
-
-Use it as a routing and reliability layer around **MCP tool catalogs, A2A agents, LangGraph workflows, AutoGen teams, enterprise catalogs, marketplaces, cloud agents, and edge runtimes**.
+AgentWeave is an open-source routing and reliability layer for tool-rich and multi-agent systems. It reduces the tool or agent set exposed to a model before inference, while keeping policy, provenance, recovery, and downstream execution explicit.
 
 ```text
 large tool / agent catalog
@@ -20,46 +18,35 @@ large tool / agent catalog
           ↓
  smaller model-visible set
           ↓
-   your existing model
+   existing model
           ↓
  execution + verification
 ```
 
-**Why this matters:** when a system exposes many heterogeneous tools or agents, the model has to reason over a larger action space. AgentWeave moves part of that decision into a reproducible pre-inference layer and keeps selection, policy, trust, recovery, and provenance explicit.
-
-> **Routing is optional, not dogmatic.** If deterministic role, tenant, permission, or policy scope already reduces the catalog enough, use that first. Add task-aware routing only when the remaining action space still needs it.
+Use deterministic scope reduction first when role, tenant, permission, or policy already narrows the catalog sufficiently. Add task-aware routing only when the remaining action space still needs it.
 
 ## Start here
 
-| If you are building... | Start with... |
+| Use case | Guide |
 |---|---|
 | MCP tool-rich agents | [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) |
 | LangGraph workflows | [`docs/LANGGRAPH_INTEGRATION.md`](docs/LANGGRAPH_INTEGRATION.md) |
 | AutoGen teams | [`docs/AUTOGEN_INTEGRATION.md`](docs/AUTOGEN_INTEGRATION.md) |
 | A2A interoperable agents | [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md) |
-| Reproducible BFCL-derived evaluation | [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md) |
-| API / compatibility details | [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md) |
+| BFCL-derived evaluation | [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md) |
+| API compatibility | [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md) |
 
-## What AgentWeave adds
+## Core capabilities
 
-Agent interoperability answers **how agents communicate**. AgentWeave focuses on **which tools/agents should be visible or selected, whether they satisfy policy and trust constraints, where they should execute, how teams should be formed, and what happens when execution fails**.
-
-Core capabilities include:
-
-- **Pre-inference routing:** construct a smaller model-visible action space before the model call.
-- **Requirement-aware selection:** infer task capabilities and rank matching agents/tools.
-- **Policy and placement:** scopes, jurisdiction, residency, locality, risk tiers, human approval, and tool restrictions.
-- **Contextual trust:** identity, validation, freshness, historical outcomes, governance, and reputation.
-- **Global team optimization:** capability coverage, redundancy, diversity, cost, latency, and communication overhead.
-- **A2A interoperability:** Agent Cards, JSON-RPC, HTTP+JSON, streaming, push notifications, subscription, retry/resume, and gRPC lifecycle calls.
-- **Runtime recovery:** detect failure, update trust, re-rank alternatives, and fail over automatically.
-- **Durable workflows:** checkpoint multi-step work and resume without replaying completed steps.
-- **Verification and consensus:** contradiction, uncertainty, semantic verification, result validation, and conflict handling.
-- **Observability and auditability:** structured traces, audit events, metrics, and explicit selection evidence.
+- Pre-inference routing and requirement-aware selection
+- Policy, placement, trust, and provenance controls
+- Multi-agent team optimization
+- A2A interoperability and external SDK compatibility
+- Runtime recovery, re-ranking, and failover
+- Durable workflows with checkpoint/resume
+- Verification, consensus, observability, and auditability
 
 ## Quick start
-
-Install from source:
 
 ```bash
 git clone https://github.com/sauravsingla/agentweave.git
@@ -68,7 +55,7 @@ python -m pip install -e '.[dev]'
 pytest -q
 ```
 
-Minimal A2A example:
+Minimal example:
 
 ```python
 import asyncio
@@ -117,113 +104,63 @@ Optional integrations:
 python -m pip install -e '.[security,api,tck,grpc,native,postgres,aws,observability,edge,yaml,ontology]'
 ```
 
-## Integration boundaries
+## Integration model
+
+AgentWeave sits before downstream model or agent execution rather than replacing existing frameworks.
 
 ### MCP
 
-AgentWeave can sit between an MCP tool catalog and the model-facing tool list:
-
 ```text
-MCP tools
-   ↓
-policy / capability filtering
-   ↓
-AgentWeave routing
-   ↓
-smaller model-visible tool set
-   ↓
-normal model execution
+MCP tools → policy/capability filtering → AgentWeave routing → model-visible tools
 ```
-
-See [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md).
 
 ### LangGraph
 
 ```text
-LangGraph state
-      ↓
-AgentWeave routing node
-      ↓
-selected specialists + explanation
-      ↓
-normal downstream LangGraph nodes
+LangGraph state → AgentWeave routing node → selected specialists → downstream nodes
 ```
-
-See [`docs/LANGGRAPH_INTEGRATION.md`](docs/LANGGRAPH_INTEGRATION.md).
 
 ### AutoGen
 
 ```text
-task
- ↓
-AgentWeave routing
- ↓
-selected AutoGen participants
- ↓
-normal AutoGen team execution
+task → AgentWeave routing → selected participants → AutoGen execution
 ```
-
-See [`docs/AUTOGEN_INTEGRATION.md`](docs/AUTOGEN_INTEGRATION.md).
 
 ### A2A
 
-AgentWeave treats A2A as the communication substrate rather than replacing it. Independent upstream A2A SDK agents are launched and invoked in GitHub Actions.
+AgentWeave treats A2A as the communication substrate. The proof suite launches independent upstream A2A SDK agents and exercises discovery and invocation across Python, Go, JavaScript, and Java.
 
-| SDK | Discovery | Invocation |
-|---|---:|---:|
-| Python | ✅ | ✅ |
-| Go | ✅ | ✅ |
-| JavaScript | ✅ | ✅ |
-| Java | ✅ | ✅ |
-
-The proof suite also runs the official A2A TCK against AgentWeave as the system under test.
-
-**Current proof:** ✅ JSON-RPC MUST-level TCK.
+**Current proof:** JSON-RPC MUST-level TCK.
 
 See [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md).
 
 ## Architecture
 
 ```text
-Cloud / Marketplace / Enterprise / Edge Agents
-                    │
-              Agent Discovery
-                    │
-              Agent Registry
-                    │
-      Identity / Security / Policy
-                    │
-        Requirement Intelligence
-      lexical → semantic → optional LLM
-                    │
-     Capability + Knowledge Ontology
-                    │
-            Contextual Trust
-                    │
-        Matching + Placement
-                    │
-        Global Team Optimizer
-                    │
-                   A2A
-                    │
-      Runtime Failure Detection
-                    │
-       Trust Update + Re-ranking
-                    │
-      Replacement Agent / Team
-                    │
-      Durable Checkpoint / Resume
-                    │
-   Consensus + Conflict Resolution
-                    │
-     Result + Semantic Verification
-                    │
-      Reputation + Dynamic Retesting
+Discovery
+   ↓
+Registry
+   ↓
+Identity / Security / Policy
+   ↓
+Requirement Intelligence
+   ↓
+Capability + Knowledge Matching
+   ↓
+Contextual Trust + Placement
+   ↓
+Team Optimization
+   ↓
+A2A / Tool Execution
+   ↓
+Failure Detection + Recovery
+   ↓
+Verification + Observability
 ```
 
 ## Research evidence
 
-AgentWeave deliberately separates **routing/selection evidence**, **process-verification evidence**, **controlled executable outcomes**, and **BFCL-derived function-calling evidence** rather than presenting unlike measurements as one leaderboard.
+AgentWeave keeps routing, process-verification, executable-outcome, and BFCL-derived evidence separate rather than combining unlike metrics into one score.
 
 | Evidence | Evaluation problem | Current result |
 |---|---|---|
@@ -231,33 +168,29 @@ AgentWeave deliberately separates **routing/selection evidence**, **process-veri
 | **ToolBench** | Tool/API retrieval over 4,856 APIs | **35.8% Hit@1**, **47.5% Hit@3**, **53.8% Hit@5**, MRR **0.440** |
 | **AgencyBench** | Capability-family routing | **57.0% zero-shot Hit@1**; **67.2% cumulative-context Hit@1**; **92.2% cumulative-context Hit@3** |
 | **AgentProcessBench** | Label-blind process verification | **55.88% step micro accuracy**; **38.30% first-error accuracy** across **1,000 trajectories / 8,509 steps** |
-| **BFCL routing-pressure v6** | Native BFCL validity under augmented tool pressure | **6/48 = 12.5% AgentWeave vs 0/48 for all three matched baselines**, exact McNemar **p = 0.03125** |
+| **BFCL routing-pressure v6** | Native BFCL validity under augmented tool pressure | **6/48 = 12.5% AgentWeave vs 0/48 for all matched baselines**, exact McNemar **p = 0.03125** |
 | **Executable team benchmark** | Controlled multi-agent completion and recovery | **100% completion**, **0.937 mean quality**, **100% recovery** in the preregistered repeated-seed study |
 
-### BFCL-derived routing-pressure replication
+### BFCL-derived routing-pressure study
 
 The v6 study uses 48 fresh BFCL V4 `multiple` tasks, a pinned local `MadeAgents/Hammer2.1-1.5b` model, 16-tool pressure, and matched all-tools, random-top-8, semantic-top-8, and AgentWeave conditions.
 
-| Study | Fresh tasks | AgentWeave | All-tools | Random top-8 | Semantic top-8 |
-|---|---:|---:|---:|---:|---:|
-| **V5 pilot** | 12 | **2/12 = 16.67%** | 0/12 | 0/12 | 0/12 |
-| **V6 replication** | 48 | **6/48 = 12.5%** | 0/48 | 0/48 | 0/48 |
+AgentWeave achieved **6/48 = 12.5%** native successes versus **0/48** for each matched baseline. The paired advantage is **+12.5 percentage points**, with a **10,000-resample paired bootstrap 95% CI of +4.17 to +22.92 pp** and exact McNemar **p = 0.03125**.
 
-For v6, the paired AgentWeave advantage versus each matched baseline is **+12.5 percentage points**, with a **10,000-resample paired bootstrap 95% CI of +4.17 to +22.92 pp** and exact McNemar **p = 0.03125**. Relative to all-tools, AgentWeave exposes **70.18% fewer tools**, uses **61.70% fewer input tokens**, and shows **50.95% lower mean local-model latency**.
+Relative to all-tools, AgentWeave exposed **70.18% fewer tools**, used **61.70% fewer input tokens**, and showed **50.95% lower mean local-model latency**.
 
-**Important boundary:** this is a **BFCL-derived routing-pressure study, not an official full BFCL leaderboard score**.
+**Boundary:** this is a BFCL-derived routing-pressure study, not an official full BFCL leaderboard score.
 
-Results and reproduction:
+Reproduction and frozen results:
 
 - [`BFCL_V5_RESULTS.md`](BFCL_V5_RESULTS.md)
 - [`BFCL_V6_RESULTS.md`](BFCL_V6_RESULTS.md)
 - [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md)
-- [`evaluation/bfcl-routing-pressure-v5-frozen.json`](evaluation/bfcl-routing-pressure-v5-frozen.json)
 - [`evaluation/bfcl-routing-pressure-v6-frozen.json`](evaluation/bfcl-routing-pressure-v6-frozen.json)
 
 ### Frozen-router generalization
 
-AgentWeave maintains a sequence of newly introduced untouched holdouts. Each router version is scored once on its new holdout and then frozen.
+AgentWeave evaluates new router versions on newly introduced untouched holdouts, then freezes those results. Percentages across rows are not directly comparable; the valid comparison is the previous router versus the new router on the same new holdout.
 
 | Evaluation | Tasks | Same-holdout result |
 |---|---:|---:|
@@ -269,103 +202,39 @@ AgentWeave maintains a sequence of newly introduced untouched holdouts. Each rou
 | Router V6 | 72 | 37.5% → **59.7% interactive Hit@1** |
 | Router V7 | 72 | 73.6% → **91.7% search-family Hit@1** |
 
-These rows use different holdouts. The valid comparison is the previous router versus the new router on the **same newly introduced holdout**, not percentages across rows.
+## Scientific boundaries
 
-## Reproducibility and scientific boundaries
+- Scored studies are frozen after scoring.
+- Weak and negative results are retained.
+- New router versions use newly introduced holdouts.
+- BFCL-derived evidence is not described as an official BFCL leaderboard result.
+- Controlled synthetic execution is not described as production performance.
+- Routing accuracy is not presented as native task completion.
+- Changes to model, sample, router, distractors, or protocol require a new study.
 
-The repository keeps research claims deliberately narrow:
+The paper-quality evaluation also retains the post-hoc result that simple zero-shot embedding baselines outperform the original frozen AgentWeave router on the already-observed General-AgentBench set.
 
-- scored studies are frozen after scoring;
-- weak and negative results are retained;
-- newly introduced holdouts are used for later router versions;
-- paired bootstrap intervals and exact McNemar tests are reported where appropriate;
-- BFCL-derived routing-pressure evidence is not described as an official BFCL leaderboard result;
-- controlled synthetic execution is not described as production performance;
-- routing accuracy is not presented as native task completion;
-- changes to model, sample, router, distractors, or protocol require a new study rather than rewriting frozen evidence.
+## Reliability, security, and scale
 
-The paper-quality evaluation also preserves the post-hoc result that simple zero-shot embedding baselines outperform the original frozen AgentWeave router on the already-observed General-AgentBench set.
+AgentWeave supports failure detection, trust updates, re-ranking, replacement selection, retry, and durable checkpoint/resume workflows.
 
-## Runtime recovery and durable workflows
+The proof suite covers malicious Agent Cards, prompt injection, data exfiltration, SSRF/link-local access, tool abuse, spoofing, Sybil/collusion, reputation poisoning, Byzantine disagreement, malformed results, and timeouts. It also exercises Docker isolation, JWT Verifiable Credentials, revocation, key rotation, KMS/HSM boundaries, PostgreSQL concurrency, governance constraints, and chaos scenarios.
 
-When a selected agent fails, AgentWeave can update trust, re-rank remaining candidates, choose a replacement, and continue execution.
+A passing proof is evidence for the configured test runtime; it is not a formal security, HA, hardware-attestation, or compliance certification.
 
-```text
-requirement
-   ↓
-select Agent A
-   ↓
-Agent A fails
-   ↓
-trust update + re-ranking
-   ↓
-select Agent B
-   ↓
-retry / continue
-   ↓
-validate final outcome
-```
-
-`DurableAgentWeave` checkpoints completed workflow steps and can resume from the next unfinished step. Persistence paths include SQLite, PostgreSQL, and replicated storage.
-
-## Security and governance
-
-The proof suite covers malicious Agent Cards, prompt injection, data exfiltration, SSRF/link-local access, tool abuse, spoofing, Sybil/collusion, reputation poisoning, Byzantine disagreement, malformed results, and timeouts.
-
-It also exercises Docker isolation, JWT Verifiable Credentials, revocation, certificate/key rotation, KMS/HSM integration boundaries, PostgreSQL concurrency and reconnect behavior, governance constraints, and chaos scenarios.
-
-A passing proof is evidence for the configured test runtime; it is **not** a formal security, HA, hardware-attestation, or compliance certification.
-
-## Scalability
-
-A physical GitHub Actions run evaluated synthetic populations up to 1,000,000 agents. The repository reports both positive and negative measurements; notably, the current native C++ ranking path is slower than Python in that benchmark and is reported as such.
-
-## Paper
-
-**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**
-
-- **arXiv:** [2608.23078](https://arxiv.org/abs/2608.23078)
-- **Paper details:** [`PAPER.md`](PAPER.md)
-
-The published preprint describes the routing methodology and BFCL-derived studies. Research claims should be interpreted within the reproducibility and scientific boundaries documented in this repository.
+Synthetic scalability runs extend to **1,000,000 agents**. Negative measurements are preserved as part of the evidence record.
 
 ## Current design work
 
-Two active design questions are tracked publicly:
-
 - [Issue #22 — make tool-routing provenance explicit](https://github.com/sauravsingla/agentweave/issues/22)
 - [Issue #27 — policy-first static scope filtering before dynamic tool routing](https://github.com/sauravsingla/agentweave/issues/27)
-
-The intended direction is:
-
-```text
-source catalog
-    ↓
-authorization / deterministic scope
-    ↓
-optional task-aware routing
-    ↓
-final model-visible capability set
-```
-
-The portable evidence should describe **what transformations produced the model-visible set**, not expose private reasoning traces.
+- [Issue #29 — stage-specific failure analysis and recovery stress tests](https://github.com/sauravsingla/agentweave/issues/29)
 
 ## Contributing
 
-External reproductions, interoperability reports, integrations, benchmark scenarios, security tests, documentation improvements, and real-world evaluation datasets are especially welcome.
+External reproductions, interoperability reports, integrations, benchmark scenarios, security tests, and documentation improvements are welcome.
 
-- **Issues:** use GitHub Issues.
-- **Pull requests:** see [`CONTRIBUTING.md`](CONTRIBUTING.md).
-- **Compatibility:** see [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md).
-- **Security:** see [`SECURITY.md`](SECURITY.md).
-
-## Release and compatibility
-
-AgentWeave follows Semantic Versioning. See [`CHANGELOG.md`](CHANGELOG.md), [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md), and [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md).
-
-## About
-
-AgentWeave is an open-source project by **Saurav Singla** for research and engineering around pre-inference routing and interoperable, trustworthy, failure-aware multi-agent orchestration.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`CHANGELOG.md`](CHANGELOG.md), and [`CITATION.cff`](CITATION.cff).
 
 ## License
 
