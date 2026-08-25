@@ -2,7 +2,6 @@
 
 ## AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models
 
-**Authors:** Saurav Singla, Aarav Singla, Advik Gupta, Parnika Gupta  
 **arXiv:** 2608.23078  
 **Paper:** https://arxiv.org/abs/2608.23078
 
@@ -10,14 +9,7 @@ AgentWeave studies deterministic pre-inference routing for tool-rich language-mo
 
 ### Citation
 
-```bibtex
-@article{singla2026agentweave,
-  title={AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models},
-  author={Singla, Saurav and Singla, Aarav and Gupta, Advik and Gupta, Parnika},
-  journal={arXiv preprint arXiv:2608.23078},
-  year={2026}
-}
-```
+**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models.** arXiv:2608.23078 (2026).
 
 ### Research boundary
 
