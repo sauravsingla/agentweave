@@ -5,6 +5,8 @@
 [![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
 [![Paper Quality](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml)
 
+**Paper:** [AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models](https://arxiv.org/abs/2608.23078) — arXiv:2608.23078
+
 **AgentWeave reduces the tool/agent set before inference so a model sees a smaller, more relevant action space — without changing the underlying model.**
 
 Use it as a routing and reliability layer around **MCP tool catalogs, A2A agents, LangGraph workflows, AutoGen teams, enterprise catalogs, marketplaces, cloud agents, and edge runtimes**.
@@ -320,11 +322,12 @@ A physical GitHub Actions run evaluated synthetic populations up to 1,000,000 ag
 
 ## Paper
 
-A research preprint is in preparation under the working title:
+**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**
 
-**AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich LLM Agents**
+- **arXiv:** [2608.23078](https://arxiv.org/abs/2608.23078)
+- **Paper details:** [`PAPER.md`](PAPER.md)
 
-Until an archival paper is published, research users should cite the software using [`CITATION.cff`](CITATION.cff). No arXiv identifier or DOI is claimed yet.
+The published preprint describes the routing methodology and BFCL-derived studies. Research claims should be interpreted within the reproducibility and scientific boundaries documented in this repository.
 
 ## Current design work
 
