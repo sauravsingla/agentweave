@@ -52,4 +52,4 @@ The purpose is to test the architectural contract from Issue #28:
 
 `scope/policy prefilter -> routing -> model selection -> fail-closed authorization -> execution`
 
-The benchmark code is in [`evaluation/adversarial_authorization_benchmark.py`](../evaluation/adversarial_authorization_benchmark.py), with regression coverage in [`tests/test_adversarial_authorization_benchmark.py`](../tests/test_adversarial_authorization_benchmark.py).
+The benchmark code is in [`agentweave_security/adversarial_benchmark.py`](../agentweave_security/adversarial_benchmark.py), with regression coverage in [`tests/test_adversarial_authorization_benchmark.py`](../tests/test_adversarial_authorization_benchmark.py).
