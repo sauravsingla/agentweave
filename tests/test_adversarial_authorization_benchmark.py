@@ -1,4 +1,4 @@
-from evaluation.adversarial_authorization_benchmark import (
+from agentweave_security.adversarial_benchmark import (
     ExposureCondition,
     default_adversarial_scenarios,
     run_adversarial_comparison,
