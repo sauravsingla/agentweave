@@ -225,8 +225,7 @@ Synthetic scalability runs extend to **1,000,000 agents**. Negative measurements
 ## Current design work
 
 - [Issue #22 — make tool-routing provenance explicit](https://github.com/sauravsingla/agentweave/issues/22)
-- [Issue #27 — policy-first static scope filtering before dynamic tool routing](https://github.com/sauravsingla/agentweave/issues/27)
-- [Issue #29 — stage-specific failure analysis and recovery stress tests](https://github.com/sauravsingla/agentweave/issues/29)
+- [Issue #35 — evaluate deferred tool search versus policy-first routing](https://github.com/sauravsingla/agentweave/issues/35)
 
 ## Contributing
 
