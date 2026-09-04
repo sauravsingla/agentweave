@@ -4,10 +4,21 @@
 [![A2A SDK Interop](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/sdk-interop.yml)
 [![Deep Proof](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/deep-proof.yml)
 [![Paper Quality](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/paper-quality.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Cite](https://img.shields.io/badge/cite-CITATION.cff-blue.svg)](CITATION.cff)
 
-**Your agent has 100+ tools. Don't make the model reason over all of them.**
+**Pre-inference routing for tool-rich LLM and multi-agent systems.**
 
-AgentWeave is an open-source **pre-inference routing and reliability layer** for MCP, tool-rich LLM applications, and multi-agent systems. It reduces the tool or agent set visible to the model before inference while keeping policy, provenance, recovery, and execution explicit.
+> **Your agent has 100+ tools. Don't make the model reason over all of them. Route first, then reason over a smaller relevant action space.**
+
+AgentWeave is an open-source **routing and reliability layer** for MCP, tool-rich LLM applications, and multi-agent systems. It reduces the tools or agents visible to the model before inference while keeping **policy, provenance, recovery, and execution explicit**.
+
+**70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency**  
+**MCP · A2A · LangGraph · AutoGen · policy-aware routing · recovery · reproducible evaluation**
+
+**Quick links:** [30-second start](#30-second-start) · [Results](#results-at-a-glance) · [MCP](docs/MCP_INTEGRATION.md) · [A2A](docs/A2A_COMPATIBILITY.md) · [Architecture](#architecture) · [Reproduce](docs/BFCL_REPRODUCE.md) · [Paper](https://arxiv.org/abs/2608.23078)
+
+> **Want to try it?** Install AgentWeave and run the test suite in under a minute → [30-second start](#30-second-start)
 
 ```text
 100+ tools / agents
@@ -25,28 +36,43 @@ execution + verification
 
 AgentWeave does **not** replace MCP, LangGraph, AutoGen, A2A, or your model. It sits in front of them and reduces the decision space.
 
-## Why route before reasoning?
+## When should I use AgentWeave?
 
-Large tool catalogs increase prompt size and force the model to choose among many irrelevant actions. AgentWeave makes candidate construction an explicit systems stage: apply deterministic authorization/policy scope first, then use task-aware routing only when the remaining action space is still large.
+AgentWeave is designed for systems where a model or agent can access a **large heterogeneous catalog of tools or specialist agents** and the model-visible action space should be reduced before inference.
 
-### Evidence at a glance
+Typical use cases include MCP servers with large tool catalogs, multi-agent specialist pools, enterprise capability catalogs, A2A ecosystems, LangGraph workflows, AutoGen teams, marketplaces, cloud agents, and edge runtimes.
 
-In the frozen **BFCL-derived routing-pressure v6** study (48 BFCL V4 `multiple` tasks, 16-tool pressure, pinned local model):
+If deterministic role, tenant, permission, or policy scope already reduces the catalog sufficiently, use that first. AgentWeave's task-aware routing is for the remaining cases where the model-visible action space is still too large.
 
-| Result | AgentWeave |
-|---|---:|
-| Native task successes | **6/48 (12.5%)** |
-| Matched all-tools baseline | **0/48** |
-| Random top-8 baseline | **0/48** |
-| Semantic top-8 baseline | **0/48** |
-| Tools exposed vs all-tools | **70.18% fewer** |
-| Input tokens vs all-tools | **61.70% fewer** |
-| Mean local-model latency | **50.95% lower** |
-| Exact McNemar test | **p = 0.03125** |
+## What is different?
 
-> **Scientific boundary:** this is a BFCL-derived routing-pressure experiment, **not** an official full BFCL leaderboard score. The absolute 12.5% success rate is intentionally reported alongside the relative result.
+AgentWeave brings four concerns into one routing layer:
 
-[Reproduce the BFCL-derived study](docs/BFCL_REPRODUCE.md) · [Frozen v6 results](BFCL_V6_RESULTS.md) · [Read the paper](https://arxiv.org/abs/2608.23078)
+- **Route before reasoning:** construct a smaller relevant action space before the model call.
+- **Policy and trust first:** apply authorization, placement, trust, provenance, and governance constraints explicitly.
+- **Failure-aware execution:** detect failures, re-rank alternatives, recover, and resume durable workflows.
+- **Auditable evaluation:** keep benchmark protocols, weak results, negative results, and scientific claim boundaries explicit.
+
+## Results at a glance
+
+> The headline BFCL result is a **BFCL-derived routing-pressure experiment, not an official full BFCL leaderboard score**.
+
+| Evidence | Verified result |
+|---|---|
+| BFCL routing-pressure v6 | **6/48 native task successes vs 0/48 for matched all-tools, random top-8, and semantic top-8 baselines** |
+| Tool exposure | **70.18% fewer** than all-tools |
+| Input tokens | **61.70% fewer** than all-tools |
+| Mean local-model latency | **50.95% lower** than all-tools |
+| Statistical test | Exact McNemar **p = 0.03125** |
+| AgentBench | **52.0% Hit@1; 89.9% accuracy on committed routes at 46.3% coverage** |
+| ToolBench | **35.8% Hit@1; 47.5% Hit@3; 53.8% Hit@5; MRR 0.440** |
+| AgencyBench | Up to **92.2% cumulative-context Hit@3** |
+| Executable team benchmark | **100% completion; 0.937 mean quality; 100% recovery** in the preregistered repeated-seed study |
+| Synthetic scale exercised | Up to **1,000,000 agents** |
+
+The BFCL-derived v6 study uses 48 BFCL V4 `multiple` tasks, 16-tool pressure, and a pinned local model. The absolute **12.5% native task success rate** is intentionally retained alongside the relative improvements.
+
+[Reproduce the study](docs/BFCL_REPRODUCE.md) · [Frozen v6 results](BFCL_V6_RESULTS.md) · [Read the paper](https://arxiv.org/abs/2608.23078)
 
 ## Start with your stack
 
@@ -59,23 +85,7 @@ In the frozen **BFCL-derived routing-pressure v6** study (48 BFCL V4 `multiple` 
 | **BFCL-derived evaluation** | [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md) |
 | **API compatibility** | [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md) |
 
-### MCP mental model
-
-```text
-MCP tools
-   ↓
-authorization / policy filtering
-   ↓
-AgentWeave routing
-   ↓
-bounded relevant tool set
-   ↓
-LLM
-```
-
-If role, tenant, permission, or policy already reduces the catalog sufficiently, stop there. AgentWeave's task-aware routing is for the remaining cases where the model-visible action space is still too large.
-
-## Quick start
+## 30-second start
 
 ```bash
 git clone https://github.com/sauravsingla/agentweave.git
@@ -127,19 +137,20 @@ agentweave --config agentweave.yaml config-check
 agentweave solve --semantic-verify "Research and verify this topic"
 ```
 
-## What AgentWeave adds
+## Core capabilities
 
-- Pre-inference routing and requirement-aware selection
-- Policy, placement, trust, and provenance controls
-- Multi-agent team optimization
-- A2A interoperability and external SDK compatibility
-- Runtime recovery, re-ranking, and failover
-- Durable workflows with checkpoint/resume
-- Verification, consensus, observability, and auditability
+- **Pre-inference routing:** construct a smaller model-visible action space before the model call.
+- **Requirement-aware selection:** infer task capabilities and rank matching agents/tools.
+- **Policy and placement:** scopes, jurisdiction, residency, locality, risk tiers, human approval, and tool restrictions.
+- **Contextual trust:** identity, validation, freshness, historical outcomes, governance, and reputation.
+- **Team optimization:** capability coverage, redundancy, diversity, cost, latency, and communication overhead.
+- **A2A interoperability:** external SDK compatibility and protocol-level proof paths.
+- **Runtime recovery:** detect failure, update trust, re-rank alternatives, and fail over.
+- **Durable workflows:** checkpoint multi-step work and resume without replaying completed steps.
+- **Verification and consensus:** contradiction, uncertainty, semantic verification, result validation, and conflict handling.
+- **Observability and auditability:** structured traces, audit events, metrics, and explicit selection evidence.
 
 ## Integration model
-
-AgentWeave sits before downstream model or agent execution rather than replacing existing frameworks.
 
 ```text
 MCP       → policy/capability filtering → AgentWeave → model-visible tools
@@ -201,22 +212,42 @@ Synthetic scalability runs extend to **1,000,000 agents**. Negative measurements
 
 ## Architecture
 
-```text
-Discovery → Registry → Identity / Security / Policy
-          → Requirement Intelligence
-          → Capability + Knowledge Matching
-          → Contextual Trust + Placement
-          → Team Optimization
-          → A2A / Tool Execution
-          → Failure Detection + Recovery
-          → Verification + Observability
+```mermaid
+flowchart LR
+    C[Tool / agent catalog] --> P[Policy + permission scope]
+    P --> R[AgentWeave routing]
+    R --> S[Small relevant candidate set]
+    S --> E[Existing LLM / agent framework]
+    E --> V[Execution + verification]
+    V -->|failure| R
 ```
+
+AgentWeave keeps routing as an explicit systems stage rather than embedding selection invisibly inside downstream model reasoning.
+
+## Evidence & documentation
+
+| Area | Documentation |
+|---|---|
+| MCP | [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) |
+| A2A interoperability | [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md) |
+| LangGraph | [`docs/LANGGRAPH_INTEGRATION.md`](docs/LANGGRAPH_INTEGRATION.md) |
+| AutoGen | [`docs/AUTOGEN_INTEGRATION.md`](docs/AUTOGEN_INTEGRATION.md) |
+| BFCL reproduction | [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md) |
+| API compatibility | [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md) |
+| Research paper | [`PAPER.md`](PAPER.md) · [arXiv:2608.23078](https://arxiv.org/abs/2608.23078) |
+| Research citation | [`CITATION.cff`](CITATION.cff) |
+
+## Project status
+
+AgentWeave is an **active research and engineering project**. APIs and evaluation protocols may evolve; pin a release or commit when using results in reproducible experiments.
+
+The strongest current evidence is around **pre-inference routing, interoperability, recovery, and reproducible evaluation**. Published benchmark claims remain scoped to their documented models, datasets, protocols, and test environments.
 
 ## Contributing
 
 **External reproductions are especially valuable.** If you test AgentWeave on your own MCP server, tool catalog, agent framework, or benchmark, please open an issue or PR with what worked, what failed, and the catalog size.
 
-Integrations, benchmark scenarios, security tests, interoperability reports, and documentation improvements are also welcome.
+Contributions are welcome around routing, integrations, benchmark scenarios, security tests, interoperability reports, evaluation datasets, and documentation.
 
 See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`CHANGELOG.md`](CHANGELOG.md), and [`CITATION.cff`](CITATION.cff).
 
