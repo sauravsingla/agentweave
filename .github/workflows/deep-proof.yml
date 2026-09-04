@@ -22,7 +22,7 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -e '.[dev,tck,grpc,api]'
-      - run: nohup python -m agentweave.a2a_server > /tmp/agentweave-a2a.log 2>&1 &
+      - run: nohup python scripts/a2a_tck_server.py > /tmp/agentweave-a2a.log 2>&1 &
       - name: Wait for Agent Card
         run: |
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:9998/.well-known/agent-card.json && exit 0; sleep 1; done
