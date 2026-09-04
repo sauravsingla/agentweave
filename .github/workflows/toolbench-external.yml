@@ -33,8 +33,22 @@ jobs:
           pip install 'datasets>=3.6,<5'
 
       - name: Evaluate ToolBench external open-catalog routing
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          python scripts/toolbench_external_eval.py
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if python scripts/toolbench_external_eval.py; then
+              break
+            fi
+            if [ "$attempt" -eq 5 ]; then
+              echo "ToolBench evaluation failed after $attempt attempts"
+              exit 1
+            fi
+            delay=$((attempt * 30))
+            echo "ToolBench evaluation attempt $attempt failed; retrying in ${delay}s"
+            sleep "$delay"
+          done
           cat toolbench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload ToolBench evaluation evidence
