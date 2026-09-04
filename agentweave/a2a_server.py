@@ -18,22 +18,12 @@ from a2a.helpers import (
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.request_handlers import DefaultRequestHandler
-from a2a.server.request_handlers.request_handler import validate, validate_request_params
 from a2a.server.routes import create_agent_card_routes, create_jsonrpc_routes
 from a2a.server.tasks import InMemoryTaskStore, TaskUpdater
 from a2a.types import AgentCapabilities, AgentCard, AgentInterface, AgentSkill, TaskState
-from a2a.utils.errors import TaskNotFoundError, UnsupportedOperationError
 from starlette.applications import Starlette
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-
-
-TERMINAL_TASK_STATES = {
-    TaskState.TASK_STATE_COMPLETED,
-    TaskState.TASK_STATE_FAILED,
-    TaskState.TASK_STATE_CANCELED,
-    TaskState.TASK_STATE_REJECTED,
-}
 
 
 class JsonRpcContentTypeMiddleware(BaseHTTPMiddleware):
@@ -44,26 +34,6 @@ class JsonRpcContentTypeMiddleware(BaseHTTPMiddleware):
             if not content_type.startswith('application/json'):
                 return Response(status_code=415)
         return await call_next(request)
-
-
-class AgentWeaveRequestHandler(DefaultRequestHandler):
-    """A2A handler with explicit terminal-task subscription semantics."""
-
-    @validate_request_params
-    @validate(
-        lambda self: self._agent_card.capabilities.streaming,
-        'Streaming is not supported by the agent',
-    )
-    async def on_subscribe_to_task(self, params, context):
-        task = await self.task_store.get(params.id, context)
-        if task is None:
-            raise TaskNotFoundError
-        if task.status.state in TERMINAL_TASK_STATES:
-            raise UnsupportedOperationError(
-                'Cannot subscribe to a task in a terminal state'
-            )
-        async for event in super().on_subscribe_to_task(params, context):
-            yield event
 
 
 class AgentWeaveTCKExecutor(AgentExecutor):
@@ -127,7 +97,7 @@ def build_app(base_url='http://127.0.0.1:9998'):
         supported_interfaces=[AgentInterface(protocol_binding='JSONRPC',url=base_url,protocol_version='1.0')],
         skills=[skill],
     )
-    handler=AgentWeaveRequestHandler(agent_executor=AgentWeaveTCKExecutor(),task_store=InMemoryTaskStore(),agent_card=card)
+    handler=DefaultRequestHandler(agent_executor=AgentWeaveTCKExecutor(),task_store=InMemoryTaskStore(),agent_card=card)
     routes=[]; routes.extend(create_agent_card_routes(card)); routes.extend(create_jsonrpc_routes(handler,'/'))
     app=Starlette(routes=routes)
     app.add_middleware(JsonRpcContentTypeMiddleware)
