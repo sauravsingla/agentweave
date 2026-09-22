@@ -79,7 +79,7 @@ jobs:
 
       - name: Upload Router V3 evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: router-v3-external-holdout-evidence
           path: |

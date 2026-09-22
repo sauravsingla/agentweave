@@ -44,7 +44,7 @@ jobs:
           python -m pip install uv
           cd /tmp/a2a-tck && uv venv && uv pip install -e .
       - run: cd /tmp/a2a-tck && uv run ./run_tck.py --sut-host http://127.0.0.1:9998 --transport jsonrpc --level must
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: a2a-tck-reports
@@ -62,7 +62,7 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y bubblewrap
       - run: docker pull python:3.11-alpine
       - run: python scripts/security_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: security-proof
@@ -78,7 +78,7 @@ jobs:
           python-version: '3.11'
       - run: pip install -e '.[security]'
       - run: python scripts/identity_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: identity-proof
           path: identity-proof.json
@@ -107,7 +107,7 @@ jobs:
         with: {python-version: '3.11'}
       - run: pip install -e '.[postgres]'
       - run: python scripts/storage_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: postgres-durability-proof
           path: storage-proof.json
@@ -121,7 +121,7 @@ jobs:
         with: {python-version: '3.11'}
       - run: pip install -e .[dev]
       - run: python scripts/chaos_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: {name: chaos-proof, path: chaos-proof.json}
 
   governance:
@@ -133,7 +133,7 @@ jobs:
         with: {python-version: '3.11'}
       - run: pip install -e .
       - run: python scripts/governance_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: {name: governance-proof, path: governance-proof.json}
 
   result-verification:
@@ -145,7 +145,7 @@ jobs:
         with: {python-version: '3.11'}
       - run: pip install -e .
       - run: python scripts/verification_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: {name: result-verification-proof, path: verification-proof.json}
 
   research-evaluation:
@@ -158,7 +158,7 @@ jobs:
       - run: pip install -e .[dev]
       - run: python scripts/research_evaluation.py
       - run: cat research-evaluation.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: research-publication-package
           path: |
@@ -181,7 +181,7 @@ jobs:
       - run: cmake -S cpp -B cpp/build -DAGENTWEAVE_BUILD_PYBIND=ON -Dpybind11_DIR=$(python -m pybind11 --cmakedir) && cmake --build cpp/build --config Release
       - run: PYTHONPATH=cpp/build python scripts/scale_suite.py --sizes 10000,100000,1000000
       - run: cat scale-results.md >> "$GITHUB_STEP_SUMMARY"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: physical-scale-10k-100k-1m
           path: |
@@ -208,7 +208,7 @@ jobs:
         with: {python-version: '3.11'}
       - run: pip install -e '.[aws]'
       - run: python scripts/production_proof.py
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: real-marketplace-proof

@@ -51,7 +51,7 @@ jobs:
           cat agencybench-crossval-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload AgencyBench evaluation evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: agencybench-external-routing-evaluation
           path: |

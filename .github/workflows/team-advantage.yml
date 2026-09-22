@@ -22,7 +22,7 @@ jobs:
         run: pytest -q tests/test_team_advantage_benchmark.py tests/test_optimizer_relevance.py
       - name: Upload benchmark evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: team-advantage-evidence
           path: |

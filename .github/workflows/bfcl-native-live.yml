@@ -48,7 +48,7 @@ jobs:
             --output bfcl-native-live-results
       - name: Upload BFCL V6 replication evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bfcl-routing-pressure-v6-evidence
           path: bfcl-native-live-results/

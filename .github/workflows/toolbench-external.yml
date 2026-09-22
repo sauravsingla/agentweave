@@ -52,7 +52,7 @@ jobs:
           cat toolbench-routing-results.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload ToolBench evaluation evidence
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: toolbench-external-routing-evaluation
           path: |
