@@ -56,7 +56,7 @@ Changelog = "https://github.com/sauravsingla/agentweave/blob/main/CHANGELOG.md"
 [project.optional-dependencies]
 security = ["PyJWT[crypto]>=2.9", "cryptography>=42"]
 api = ["fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30"]
-tck = ["a2a-sdk==1.1.0", "starlette>=0.41", "uvicorn>=0.30", "sse-starlette>=2.1"]
+tck = ["a2a-sdk==1.1.4", "starlette>=0.41", "uvicorn>=0.30", "sse-starlette>=2.1"]
 grpc = ["grpcio>=1.70", "protobuf>=5.28"]
 native = ["pybind11>=2.13"]
 postgres = ["psycopg[binary]>=3.2"]
@@ -65,7 +65,7 @@ observability = ["opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentele
 edge = ["psutil>=6"]
 yaml = ["PyYAML>=6"]
 ontology = ["rdflib>=7.1"]
-all = ["PyJWT[crypto]>=2.9", "cryptography>=42", "fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30", "a2a-sdk==1.1.0", "sse-starlette>=2.1", "grpcio>=1.70", "protobuf>=5.28", "pybind11>=2.13", "psycopg[binary]>=3.2", "boto3>=1.35", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27", "psutil>=6", "PyYAML>=6", "rdflib>=7.1"]
+all = ["PyJWT[crypto]>=2.9", "cryptography>=42", "fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30", "a2a-sdk==1.1.4", "sse-starlette>=2.1", "grpcio>=1.70", "protobuf>=5.28", "pybind11>=2.13", "psycopg[binary]>=3.2", "boto3>=1.35", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27", "psutil>=6", "PyYAML>=6", "rdflib>=7.1"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
