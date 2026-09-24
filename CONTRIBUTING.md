@@ -24,6 +24,7 @@ Comment on the issue if you want to coordinate before starting. For concrete des
 ```bash
 python -m pip install -e '.[dev]'
 pytest -q
+python scripts/check_markdown_links.py
 ```
 
 For native C++ tests:

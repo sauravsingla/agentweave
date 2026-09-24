@@ -5,6 +5,7 @@ All notable changes to AgentWeave are documented here. The project follows Seman
 ## [Unreleased]
 
 ### Added
+- Repository-relative Markdown link checker covering README, CONTRIBUTING, and docs, with a focused unit test for broken local targets.
 - Runnable in-process multi-MCP example demonstrating duplicate `search` names, model-visible aliases, and verified dispatch to both providers.
 - A provider-neutral local runtime example with three tools, routing visibility, and callable execution, requiring no model service or optional integration packages.
 
