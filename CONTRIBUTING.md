@@ -26,6 +26,12 @@ python -m pip install -e '.[dev]'
 pytest -q
 ```
 
+The normal test suite checks repository-relative Markdown links without fetching
+external URLs. Run `pytest -q tests/test_markdown_links.py` for just this check.
+It validates inline links, images and reference definitions against local paths;
+anchor fragments are not checked. Links to generated `docs/*.html` pages are
+checked against their Markdown sources.
+
 For native C++ tests:
 
 ```bash
