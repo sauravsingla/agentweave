@@ -1,0 +1,38 @@
+name: Zenodo credential capability check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/zenodo-auth-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      ZENODO_ACCESS_TOKEN: ${{ secrets.ZENODO_ACCESS_TOKEN }}
+      ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
+      ZENODO_API_TOKEN: ${{ secrets.ZENODO_API_TOKEN }}
+    steps:
+      - name: Report token capability without exposing secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          found=false
+          for name in ZENODO_ACCESS_TOKEN ZENODO_TOKEN ZENODO_API_TOKEN; do
+            if [ -n "${!name:-}" ]; then
+              echo "${name}=available"
+              found=true
+            else
+              echo "${name}=missing"
+            fi
+          done
+          if [ "$found" != true ]; then
+            echo "ZENODO_WRITE_CAPABILITY=missing"
+          else
+            echo "ZENODO_WRITE_CAPABILITY=available"
+          fi
