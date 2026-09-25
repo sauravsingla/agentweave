@@ -8,7 +8,7 @@
 
 **Pre-inference routing and secure execution for tool-rich LLM and multi-agent systems.**
 
-**PyPI:** `agentweave-router` · **Python import:** `agentweave` · **Current release:** `v0.7.0`
+**PyPI:** `agentweave-router` · **Python import:** `agentweave` · **Current release:** `v0.7.1`
 
 AgentWeave reduces the tools or agents visible to a model before inference while keeping **scope policy, authorization, provenance, recovery, and execution explicit**.
 
