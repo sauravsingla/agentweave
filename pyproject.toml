@@ -76,7 +76,7 @@ langgraph = ["langgraph>=1,<2"]
 autogen = ["autogen-agentchat>=0.7,<1", "autogen-core>=0.7,<1"]
 all-integrations = ["mcp>=2,<3", "langgraph>=1,<2", "autogen-agentchat>=0.7,<1", "autogen-core>=0.7,<1"]
 all = ["PyJWT[crypto]>=2.9", "cryptography>=42", "fastapi>=0.115", "starlette>=0.41", "uvicorn>=0.30", "a2a-sdk>=1.1.4,<2", "sse-starlette>=2.1", "grpcio>=1.70", "protobuf>=5.28", "pybind11>=2.13", "psycopg[binary]>=3.2", "boto3>=1.35", "opentelemetry-api>=1.27", "opentelemetry-sdk>=1.27", "opentelemetry-exporter-otlp>=1.27", "psutil>=6", "PyYAML>=6", "rdflib>=7.1", "mcp>=2,<3", "langgraph>=1,<2", "autogen-agentchat>=0.7,<1", "autogen-core>=0.7,<1"]
-dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.16.8,<0.17", "mypy>=2.3.1,<2.4"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "ruff>=0.16.8,<0.17", "mypy>=2.3.1,<2.4", "bandit>=1.9,<2"]
 
 [project.scripts]
 agentweave = "agentweave.sdk:main"
