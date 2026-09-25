@@ -1,0 +1,39 @@
+name: Release v0.7.1 trigger
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/release-v071-trigger.yml'
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  trigger-release:
+    if: github.repository == 'sauravsingla/agentweave'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+      - name: Verify release metadata
+        run: python scripts/check_release_metadata.py --tag v0.7.1
+      - name: Create immutable release tag ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api "repos/${{ github.repository }}/git/ref/tags/v0.7.1" >/dev/null 2>&1; then
+            echo "::error::Tag v0.7.1 already exists; refusing to retarget it."
+            exit 1
+          fi
+          gh api --method POST "repos/${{ github.repository }}/git/refs" \
+            -f ref='refs/tags/v0.7.1' \
+            -f sha="$GITHUB_SHA"
+      - name: Dispatch canonical release workflow on the tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --ref v0.7.1 -f publish_pypi=true

@@ -4,16 +4,33 @@ All notable changes to AgentWeave are documented here. The project follows Seman
 
 ## [Unreleased]
 
-### Added
-- Runnable in-process multi-MCP example demonstrating duplicate `search` names, model-visible aliases, and verified dispatch to both providers.
-- A provider-neutral local runtime example with three tools, routing visibility, and callable execution, requiring no model service or optional integration packages.
-
-### Fixed
-- Close file-backed reputation database connections after each operation, including failures, so Windows can release database files without waiting for garbage collection. In-memory stores retain their shared connection.
-
 ### Planned
 - Additional independently hosted A2A endpoints and physical edge-hardware evidence as environments become available.
 - Additional external provider/model reproductions using the credentialed Issue #38 live protocol.
+
+## [0.7.1] - 2026-09-25
+
+### Added
+- Per-run replay/idempotency protection with explicit `ToolSpec.idempotency` modes and stronger argument-signature deduplication for high/critical-risk tools.
+- Replay telemetry and provenance so reused successful tool executions are visible in runtime audit output.
+- Runnable in-process multi-MCP example demonstrating duplicate `search` names, model-visible aliases, and verified dispatch to both providers.
+- A provider-neutral local runtime example with three tools, routing visibility, and callable execution, requiring no model service or optional integration packages.
+- Release metadata validation that separates the stable Zenodo Concept DOI from version-specific software archive DOIs.
+
+### Changed
+- Runtime-resolved tool identity is authoritative after authorization; conflicting executor-returned identity is retained only as audit metadata.
+- Structured tool results are serialized to deterministic canonical JSON for model continuation and provider interoperability.
+- Central quality/security gates now include targeted Ruff bug-pattern checks, broader mypy coverage, Bandit scanning, and replay/provenance regression coverage.
+- Packaging and integration smoke coverage was expanded across supported Python and optional-integration lanes.
+
+### Fixed
+- Close file-backed reputation database connections after each operation, including failures, so Windows can release database files without waiting for garbage collection. In-memory stores retain their shared connection.
+- Preserve existing positional `ToolSpec` construction compatibility while adding idempotency configuration.
+
+### Security
+- Successful side-effectful calls can no longer be silently re-executed during bounded recovery when replay protection applies.
+- Executor-supplied provenance cannot replace the canonical tool identity that passed runtime validation and authorization.
+- Security-sensitive runtime surfaces are now included in static bug-pattern, typed-surface, and Bandit CI gates.
 
 ## [0.7.0] - 2026-09-23
 

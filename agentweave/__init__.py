@@ -53,7 +53,7 @@ from .runtime_types import (
 )
 from .safe_http import SafeHttpTransport
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 __all__ = [
     "AgentWeave",
