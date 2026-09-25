@@ -1,0 +1,47 @@
+name: Fix Demo Video Visibility
+
+on:
+  push:
+    branches:
+      - docs/fix-demo-video-visibility
+    paths:
+      - .github/workflows/fix-demo-video-visibility.yml
+
+permissions:
+  contents: write
+
+jobs:
+  render-visible-demo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: docs/fix-demo-video-visibility
+      - name: Generate README-safe animated preview
+        run: |
+          ffmpeg -y -i assets/agentweave_100k_tools_silent_demo.mp4 \
+            -vf "fps=8,scale=960:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" \
+            /tmp/aw_palette.png
+          ffmpeg -y -i assets/agentweave_100k_tools_silent_demo.mp4 -i /tmp/aw_palette.png \
+            -lavfi "fps=8,scale=960:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=5:diff_mode=rectangle" \
+            assets/agentweave_100k_tools_demo_preview.gif
+      - name: Replace invisible video tag with visible preview
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('README.md')
+          text = p.read_text()
+          old = '<video src="assets/agentweave_100k_tools_silent_demo.mp4" width="100%" controls preload="metadata"></video>'
+          new = '[![AgentWeave 100,000-tool demo](assets/agentweave_100k_tools_demo_preview.gif)](assets/agentweave_100k_tools_silent_demo.mp4)'
+          if old not in text:
+              raise SystemExit('expected inline video tag not found')
+          p.write_text(text.replace(old, new, 1))
+          PY
+      - name: Remove one-shot workflow and commit
+        run: |
+          rm .github/workflows/fix-demo-video-visibility.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md assets/agentweave_100k_tools_demo_preview.gif .github/workflows/fix-demo-video-visibility.yml
+          git commit -m "Make Demo Video visible in README"
+          git push origin HEAD:docs/fix-demo-video-visibility
