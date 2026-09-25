@@ -14,7 +14,7 @@ AgentWeave reduces the tools or agents visible to a model before inference while
 
 > **Your agent has 100+ tools. Don't make the model reason over all of them. Route first, then reason over a smaller relevant action space.**
 
-**70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency**  
+**Frozen BFCL-derived v6 study:** 70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency  
 **MCP · A2A · LangGraph · AutoGen · policy-aware routing · recovery · reproducible evaluation**
 
 **Quick links:** [30-second start](#30-second-start) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
@@ -34,6 +34,8 @@ schema validation
   ↓
 argument-aware authorization
   ↓
+replay / idempotency guard
+  ↓
 execution
   ↓
 bounded recovery / rediscovery
@@ -43,7 +45,7 @@ AgentWeave does **not** replace MCP, LangGraph, AutoGen, A2A, or your model. It 
 
 ## 30-second start
 
-Install the base package from PyPI:
+Install the base package from PyPI (Python 3.11+):
 
 ```bash
 pip install agentweave-router
@@ -128,7 +130,7 @@ pytest -q
 `AgentWeaveRuntime` is the primary 0.7+ execution surface. It enforces one ordering instead of asking every integration to wire security correctly:
 
 ```text
-catalog → scope → route → model → validate arguments → authorize → execute → recover
+catalog → scope → route → model → validate arguments → authorize → replay guard → execute → recover
 ```
 
 Key normalized contracts are `ToolSpec`, `ToolCall`, `ToolResult`, `ModelResponse`, `RunContext`, and `RuntimeResult`.
@@ -137,7 +139,11 @@ Tool identity is separate from the function name shown to the model. This matter
 
 Model-generated arguments are validated against each `ToolSpec.input_schema` before authorization or execution. Authorization policies receive the resolved tool identity, arguments, provider/source metadata, tenant/security context, and model-visible set. Calls outside the routed set fail closed.
 
-Every run also returns per-stage telemetry for catalog discovery, scope/routing, model calls, schema validation, authorization, execution, and recovery.
+After authorization, v0.7.1 applies per-run replay/idempotency protection before invoking the executor. `ToolSpec.idempotency` supports `auto`, `none`, `call_id`, and `arguments`; `auto` uses argument-signature protection for high/critical-risk tools and call-ID protection for other tools. Only successful executions are cached, so failures remain eligible for bounded recovery without silently repeating a protected successful side effect.
+
+Executor-returned identity cannot override the canonical tool identity that passed routing, validation, and authorization. Conflicting executor identity is retained only as audit metadata, and structured tool results are serialized deterministically for model continuation.
+
+Every run also returns per-stage telemetry for catalog discovery, scope/routing, model calls, schema validation, authorization, replay reuse, execution, and recovery, together with replay and routing provenance.
 
 ### MCP runtime
 
