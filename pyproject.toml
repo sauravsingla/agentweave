@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agentweave-router"
-version = "0.7.0"
+version = "0.7.1"
 description = "Pre-inference routing for tool-rich LLMs and multi-agent systems with MCP, A2A, LangGraph, AutoGen, policy-aware routing, recovery, and reproducible evaluation."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -54,8 +54,6 @@ Repository = "https://github.com/sauravsingla/agentweave"
 Documentation = "https://sauravsingla.github.io/agentweave/"
 "Research Paper" = "https://arxiv.org/abs/2608.23078"
 "Concept DOI" = "https://doi.org/10.5281/zenodo.22913459"
-"Version DOI" = "https://doi.org/10.5281/zenodo.22913460"
-"Software Archive" = "https://zenodo.org/records/22913460"
 Issues = "https://github.com/sauravsingla/agentweave/issues"
 Changelog = "https://github.com/sauravsingla/agentweave/blob/main/CHANGELOG.md"
 
