@@ -1,0 +1,90 @@
+name: Zenodo v0.7.1 archive check
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/zenodo-v071-check.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check-zenodo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Poll Zenodo public records API for AgentWeave v0.7.1
+        shell: python
+        run: |
+          import json
+          import time
+          import urllib.parse
+          import urllib.request
+
+          concept_doi = "10.5281/zenodo.22913459"
+          expected_version = "0.7.1"
+          repository = "https://github.com/sauravsingla/agentweave"
+
+          def fetch(url):
+              req = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "AgentWeave-release-verifier/0.7.1"},
+              )
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  return json.load(response)
+
+          def candidates():
+              queries = [
+                  f'conceptdoi:"{concept_doi}"',
+                  "conceptrecid:22913459",
+                  'title:"AgentWeave"',
+                  "AgentWeave",
+              ]
+              seen = {}
+              for query in queries:
+                  url = "https://zenodo.org/api/records?" + urllib.parse.urlencode(
+                      {"q": query, "sort": "mostrecent", "size": 20}
+                  )
+                  try:
+                      payload = fetch(url)
+                  except Exception as exc:
+                      print(f"query failed {query!r}: {type(exc).__name__}: {exc}")
+                      continue
+                  for item in (payload.get("hits") or {}).get("hits") or []:
+                      if isinstance(item, dict) and item.get("id") is not None:
+                          seen[str(item["id"])] = item
+              return list(seen.values())
+
+          def is_target(item):
+              metadata = item.get("metadata") or {}
+              version = str(metadata.get("version") or "").lstrip("v")
+              title = str(metadata.get("title") or "")
+              concept = str(item.get("conceptdoi") or metadata.get("conceptdoi") or "")
+              links = item.get("links") or {}
+              related = json.dumps(metadata.get("related_identifiers") or metadata.get("related_identifiers") or [])
+              same_project = (
+                  concept == concept_doi
+                  or repository in related
+                  or "AgentWeave" in title
+              )
+              return same_project and version == expected_version
+
+          last = []
+          for attempt in range(1, 91):
+              last = candidates()
+              for item in last:
+                  if is_target(item):
+                      record_id = str(item["id"])
+                      doi = str(item.get("doi") or (item.get("metadata") or {}).get("doi") or "")
+                      url = (item.get("links") or {}).get("html") or f"https://zenodo.org/records/{record_id}"
+                      print(f"ZENODO_FOUND id={record_id} doi={doi} url={url}")
+                      print(json.dumps(item, indent=2, sort_keys=True))
+                      raise SystemExit(0)
+              print(f"attempt {attempt}: target record not visible yet; candidates={len(last)}")
+              if attempt < 90:
+                  time.sleep(10)
+
+          print("Final candidate records:")
+          print(json.dumps(last, indent=2, sort_keys=True))
+          raise SystemExit("AgentWeave v0.7.1 Zenodo record was not found")
