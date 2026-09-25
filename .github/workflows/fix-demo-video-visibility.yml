@@ -17,6 +17,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: docs/fix-demo-video-visibility
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
       - name: Generate README-safe animated preview
         run: |
           ffmpeg -y -i assets/agentweave_100k_tools_silent_demo.mp4 \
