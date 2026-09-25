@@ -1,0 +1,133 @@
+name: v0.7.1 README/runtime alignment
+
+on:
+  push:
+    branches:
+      - fix/v071-readme-runtime-alignment
+    paths:
+      - '.github/workflows/v071-readme-runtime-alignment.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  align:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/v071-readme-runtime-alignment
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Apply runtime and README corrections
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(text: str, old: str, new: str, label: str) -> str:
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected exactly one match, found {count}")
+              return text.replace(old, new, 1)
+
+          init_path = Path('agentweave/__init__.py')
+          init_text = init_path.read_text()
+          init_text = replace_once(
+              init_text,
+              'from .runtime_hardened import AgentWeaveRuntime\n',
+              'from .runtime_hardened import AgentWeaveRuntime\n'
+              'from . import runtime as _runtime_module\n\n'
+              '# Keep direct module imports aligned with the canonical hardened runtime.\n'
+              '_runtime_module.AgentWeaveRuntime = AgentWeaveRuntime\n',
+              'runtime public import alias',
+          )
+          init_path.write_text(init_text)
+
+          readme_path = Path('README.md')
+          readme = readme_path.read_text()
+          readme = replace_once(
+              readme,
+              '**70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency**  ',
+              '**Frozen BFCL-derived v6 study:** 70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency  ',
+              'headline benchmark scope',
+          )
+          readme = replace_once(
+              readme,
+              'argument-aware authorization\n  ↓\nexecution',
+              'argument-aware authorization\n  ↓\nreplay / idempotency guard\n  ↓\nexecution',
+              'top runtime diagram',
+          )
+          readme = replace_once(
+              readme,
+              'Install the base package from PyPI:',
+              'Install the base package from PyPI (Python 3.11+):',
+              'python requirement',
+          )
+          readme = replace_once(
+              readme,
+              'catalog → scope → route → model → validate arguments → authorize → execute → recover',
+              'catalog → scope → route → model → validate arguments → authorize → replay guard → execute → recover',
+              'canonical runtime pipeline',
+          )
+          old_runtime_text = (
+              'Model-generated arguments are validated against each `ToolSpec.input_schema` before authorization or execution. '
+              'Authorization policies receive the resolved tool identity, arguments, provider/source metadata, tenant/security context, '
+              'and model-visible set. Calls outside the routed set fail closed.\n\n'
+              'Every run also returns per-stage telemetry for catalog discovery, scope/routing, model calls, schema validation, '
+              'authorization, execution, and recovery.'
+          )
+          new_runtime_text = (
+              'Model-generated arguments are validated against each `ToolSpec.input_schema` before authorization or execution. '
+              'Authorization policies receive the resolved tool identity, arguments, provider/source metadata, tenant/security context, '
+              'and model-visible set. Calls outside the routed set fail closed.\n\n'
+              'After authorization, v0.7.1 applies per-run replay/idempotency protection before invoking the executor. '
+              '`ToolSpec.idempotency` supports `auto`, `none`, `call_id`, and `arguments`; `auto` uses argument-signature protection '
+              'for high/critical-risk tools and call-ID protection for other tools. Only successful executions are cached, so failures '
+              'remain eligible for bounded recovery without silently repeating a protected successful side effect.\n\n'
+              'Executor-returned identity cannot override the canonical tool identity that passed routing, validation, and authorization. '
+              'Conflicting executor identity is retained only as audit metadata, and structured tool results are serialized deterministically '
+              'for model continuation.\n\n'
+              'Every run also returns per-stage telemetry for catalog discovery, scope/routing, model calls, schema validation, '
+              'authorization, replay reuse, execution, and recovery, together with replay and routing provenance.'
+          )
+          readme = replace_once(readme, old_runtime_text, new_runtime_text, 'v0.7.1 runtime hardening docs')
+          readme_path.write_text(readme)
+
+          test_path = Path('tests/test_runtime_public_import.py')
+          test_path.write_text(
+              'from agentweave import AgentWeaveRuntime as RootRuntime\n'
+              'from agentweave.runtime import AgentWeaveRuntime as ModuleRuntime\n'
+              'from agentweave.runtime_hardened import AgentWeaveRuntime as HardenedRuntime\n\n\n'
+              'def test_direct_runtime_import_uses_canonical_hardened_runtime():\n'
+              '    assert ModuleRuntime is RootRuntime\n'
+              '    assert ModuleRuntime is HardenedRuntime\n'
+              '    assert "arguments" in ModuleRuntime._IDEMPOTENCY_MODES\n'
+          )
+          PY
+
+      - name: Install test dependencies
+        run: python -m pip install -e '.[dev]'
+
+      - name: Run focused regression tests
+        run: |
+          python -m pytest -q \
+            tests/test_runtime_public_import.py \
+            tests/test_runtime_replay_provenance.py \
+            tests/test_runtime_hardening_v07.py \
+            tests/test_markdown_links.py
+          python -m ruff check agentweave/__init__.py tests/test_runtime_public_import.py
+
+      - name: Commit corrections and remove one-shot workflow
+        shell: bash
+        run: |
+          rm .github/workflows/v071-readme-runtime-alignment.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md agentweave/__init__.py tests/test_runtime_public_import.py .github/workflows/v071-readme-runtime-alignment.yml
+          git commit -m 'Align v0.7.1 README and canonical runtime import'
+          git push origin HEAD:fix/v071-readme-runtime-alignment
