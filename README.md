@@ -19,6 +19,10 @@ AgentWeave reduces the tools or agents visible to a model before inference while
 
 **Quick links:** [30-second start](#30-second-start) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
 
+## Demo Video
+
+https://raw.githubusercontent.com/sauravsingla/agentweave/main/assets/agentweave_100k_tools_silent_demo.mp4
+
 ```text
 catalog
   ↓
