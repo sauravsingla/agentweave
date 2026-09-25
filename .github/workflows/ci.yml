@@ -77,8 +77,33 @@ jobs:
       - run: pip install -c constraints/ci.txt -e .[dev]
       - name: Ruff correctness gate
         run: ruff check agentweave agentweave_byom agentweave_security tests
-      - name: Mypy typed-surface gate
-        run: mypy agentweave/runtime_types.py agentweave_security/authorization.py
+      - name: Ruff security-sensitive bug-pattern gate
+        run: >-
+          ruff check
+          agentweave/runtime.py
+          agentweave/runtime_hardened.py
+          agentweave/runtime_types.py
+          agentweave/safe_http.py
+          agentweave_security/authorization.py
+          agentweave_security/scope_filter.py
+          --select E9,F63,F7,F82,B006,B008,B023
+      - name: Mypy security-sensitive typed-surface gate
+        run: >-
+          mypy
+          agentweave/runtime_types.py
+          agentweave/runtime_hardened.py
+          agentweave/safe_http.py
+          agentweave_security/authorization.py
+          agentweave_security/scope_filter.py
+      - name: Bandit security gate
+        run: >-
+          bandit -q -ll
+          agentweave/runtime.py
+          agentweave/runtime_hardened.py
+          agentweave/runtime_types.py
+          agentweave/safe_http.py
+          agentweave_security/authorization.py
+          agentweave_security/scope_filter.py
 
   reproducible-python:
     runs-on: ubuntu-latest
@@ -93,4 +118,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -c constraints/ci.txt -e .[dev]
       - run: python -m pip check
-      - run: pytest -q tests/test_runtime_hardening_v07.py tests/test_security_hardening.py
+      - run: >-
+          pytest -q
+          tests/test_runtime_hardening_v07.py
+          tests/test_runtime_replay_provenance.py
+          tests/test_security_hardening.py
