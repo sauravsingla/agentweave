@@ -19,13 +19,13 @@ class ToolSpec:
     source: str | None = None
     model_name: str | None = None
     risk_level: str = "standard"
-    idempotency: str = "auto"
     permissions: frozenset[str] = frozenset()
     scopes: frozenset[str] = frozenset()
     roles: frozenset[str] = frozenset()
     tenants: frozenset[str] = frozenset()
     environments: frozenset[str] = frozenset()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    idempotency: str = "auto"
     native: Any = field(default=None, compare=False, repr=False)
 
     @property
