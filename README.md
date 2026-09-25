@@ -21,7 +21,7 @@ AgentWeave reduces the tools or agents visible to a model before inference while
 
 ## Demo Video
 
-<video src="assets/agentweave_100k_tools_silent_demo.mp4" width="100%" controls preload="metadata"></video>
+[![AgentWeave 100,000-tool demo](assets/agentweave_100k_tools_demo_preview.gif)](assets/agentweave_100k_tools_silent_demo.mp4)
 
 ```text
 catalog
