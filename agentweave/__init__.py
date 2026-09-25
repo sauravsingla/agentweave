@@ -28,7 +28,6 @@ from .plugins import (
     PluginManager,
 )
 from .runtime import (
-    AgentWeaveRuntime,
     CallableExecutor,
     CatalogProvider,
     DefaultScopePolicy,
@@ -41,6 +40,7 @@ from .runtime import (
     ToolSearchProvider,
     normalize_model_response,
 )
+from .runtime_hardened import AgentWeaveRuntime
 from .runtime_types import (
     ModelResponse,
     RunContext,
