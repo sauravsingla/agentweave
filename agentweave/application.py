@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .config import RuntimeConfig, RuntimeFactory
+from .runtime_hardened import AgentWeaveRuntime
 from .plugins import PluginManager
-from .runtime import AgentWeaveRuntime
 from .safe_http import SafeHttpTransport
 
 

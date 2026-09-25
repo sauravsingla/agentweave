@@ -4,7 +4,8 @@ import inspect
 import re
 from typing import Any, Mapping, Sequence
 
-from .runtime import AgentWeaveRuntime, CatalogProvider, Executor
+from .runtime import CatalogProvider, Executor
+from .runtime_hardened import AgentWeaveRuntime
 from .runtime_types import RunContext, ToolCall, ToolResult, ToolSpec
 
 

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from .plugins import ComponentRegistry
-from .runtime import AgentWeaveRuntime
+from .runtime_hardened import AgentWeaveRuntime
 from .safe_http import SafeHttpTransport
 
 

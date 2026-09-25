@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from typing import Any, Mapping
 
@@ -24,6 +25,7 @@ class ToolSpec:
     tenants: frozenset[str] = frozenset()
     environments: frozenset[str] = frozenset()
     metadata: Mapping[str, Any] = field(default_factory=dict)
+    idempotency: str = "auto"
     native: Any = field(default=None, compare=False, repr=False)
 
     @property
@@ -76,13 +78,29 @@ class ToolResult:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     raw: Any = field(default=None, compare=False, repr=False)
 
+    @staticmethod
+    def _canonical_json(value: Any) -> str:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            default=str,
+        )
+
     def model_content(self) -> str:
         value = self.structured_content
         if value is None:
             value = self.content
         if value is None and self.error:
             value = {"error": self.error}
-        return str(value if value is not None else "")
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        if isinstance(value, (Mapping, list, tuple, bool, int, float)):
+            return self._canonical_json(value)
+        return str(value)
 
 
 @dataclass(frozen=True)
