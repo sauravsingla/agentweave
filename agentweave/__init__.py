@@ -41,6 +41,10 @@ from .runtime import (
     normalize_model_response,
 )
 from .runtime_hardened import AgentWeaveRuntime
+from . import runtime as _runtime_module
+
+# Keep direct module imports aligned with the canonical hardened runtime.
+_runtime_module.AgentWeaveRuntime = AgentWeaveRuntime
 from .runtime_types import (
     ModelResponse,
     RunContext,
