@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml/badge.svg)](https://github.com/sauravsingla/agentweave/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/agentweave-router.svg?cacheSeconds=300&release=0.7.1)](https://pypi.org/project/agentweave-router/)
+[![GHCR](https://img.shields.io/badge/GHCR-agentweave-blue?logo=github)](https://github.com/sauravsingla/agentweave/pkgs/container/agentweave)
 [![Python](https://img.shields.io/pypi/pyversions/agentweave-router.svg)](https://pypi.org/project/agentweave-router/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22913460.svg)](https://doi.org/10.5281/zenodo.22913460)
@@ -17,7 +18,7 @@ AgentWeave reduces the tools or agents visible to a model before inference while
 **Frozen BFCL-derived v6 study:** 70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency  
 **MCP · A2A · LangGraph · AutoGen · policy-aware routing · recovery · reproducible evaluation**
 
-**Quick links:** [30-second start](#30-second-start) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
+**Quick links:** [30-second start](#30-second-start) · [Container](#container-image-ghcr) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
 
 ## Demo Video
 
@@ -128,6 +129,24 @@ cd agentweave
 python -m pip install -e '.[dev]'
 pytest -q
 ```
+
+## Container image (GHCR)
+
+The base AgentWeave CLI image is published to GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/sauravsingla/agentweave:latest
+docker run --rm ghcr.io/sauravsingla/agentweave:latest version
+```
+
+The image runs as an unprivileged user and uses `/workspace` as its writable working directory. The `agentweave` CLI is the image entry point, so subcommands can be passed directly:
+
+```bash
+docker run --rm ghcr.io/sauravsingla/agentweave:latest plugins
+docker run --rm ghcr.io/sauravsingla/agentweave:latest doctor
+```
+
+For reproducible use, prefer an immutable digest or a release tag rather than `latest`. See [`docs/CONTAINER.md`](docs/CONTAINER.md) for persistent volumes, configuration mounts, published tags, and image design.
 
 ## Canonical runtime
 
@@ -271,7 +290,7 @@ New router versions are evaluated on newly introduced untouched holdouts and the
 - Scored studies are frozen after scoring.
 - Weak and negative results are retained.
 - New router versions use newly introduced holdouts.
-- BFCL-derived evidence is not described as an official BFCL leaderboard result.
+- BFCL-derived evidence is not described as an official full BFCL leaderboard score.
 - Controlled synthetic execution is not described as production performance.
 - Routing accuracy is not presented as native task completion.
 - The Issue #38 controlled proxy artifact and real-provider artifacts are reported separately; provider/model/date/trial settings must accompany provider-backed claims.
@@ -305,6 +324,7 @@ Legacy multi-agent orchestration remains available during the pre-1.0 migration,
 | Area | Documentation |
 |---|---|
 | 0.7 quickstart | [`docs/QUICKSTART_0_7.md`](docs/QUICKSTART_0_7.md) |
+| Container image | [`docs/CONTAINER.md`](docs/CONTAINER.md) |
 | MCP | [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) |
 | A2A interoperability | [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md) |
 | LangGraph | [`docs/LANGGRAPH_INTEGRATION.md`](docs/LANGGRAPH_INTEGRATION.md) |
