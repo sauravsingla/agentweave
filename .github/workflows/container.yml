@@ -1,0 +1,130 @@
+name: Container
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/container.yml'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'LICENSE'
+      - 'agentweave/**'
+      - 'agentweave_byom/**'
+      - 'agentweave_security/**'
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*.*.*'
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - '.github/workflows/container.yml'
+      - 'pyproject.toml'
+      - 'README.md'
+      - 'LICENSE'
+      - 'agentweave/**'
+      - 'agentweave_byom/**'
+      - 'agentweave_security/**'
+  workflow_dispatch:
+
+concurrency:
+  group: container-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      LOCAL_IMAGE: agentweave-ci:${{ github.sha }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Read package version
+        id: package
+        shell: bash
+        run: |
+          VERSION=$(python - <<'PY'
+          import tomllib
+          from pathlib import Path
+          data = tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))
+          print(data['project']['version'])
+          PY
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build image
+        shell: bash
+        run: |
+          docker build --pull \
+            --build-arg VERSION='${{ steps.package.outputs.version }}' \
+            --build-arg VCS_REF='${{ github.sha }}' \
+            --tag "$LOCAL_IMAGE" \
+            .
+
+      - name: Smoke-test image
+        shell: bash
+        run: |
+          set -euo pipefail
+          EXPECTED='${{ steps.package.outputs.version }}'
+          ACTUAL=$(docker run --rm "$LOCAL_IMAGE" version | tr -d '\r')
+          test "$ACTUAL" = "$EXPECTED"
+
+          CONFIGURED_USER=$(docker inspect --format '{{.Config.User}}' "$LOCAL_IMAGE")
+          test "$CONFIGURED_USER" = '10001:10001'
+
+          RUNTIME_UID=$(docker run --rm --entrypoint sh "$LOCAL_IMAGE" -c 'id -u')
+          test "$RUNTIME_UID" = '10001'
+
+          SOURCE_LABEL=$(docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.source" }}' "$LOCAL_IMAGE")
+          test "$SOURCE_LABEL" = 'https://github.com/sauravsingla/agentweave'
+
+          docker run --rm "$LOCAL_IMAGE" plugins >/tmp/agentweave-plugins.json
+          python -m json.tool /tmp/agentweave-plugins.json >/dev/null
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Publish image to GHCR
+        if: github.event_name != 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          REPOSITORY="${GITHUB_REPOSITORY,,}"
+          IMAGE="ghcr.io/${REPOSITORY}"
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+          TAGS=("sha-${SHORT_SHA}")
+
+          if [[ "$GITHUB_REF" == 'refs/heads/main' ]]; then
+            TAGS+=("latest")
+          elif [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+            VERSION="${RELEASE_TAG#v}"
+            TAGS+=("$RELEASE_TAG" "$VERSION" "latest")
+            if [[ "$VERSION" =~ ^([0-9]+)\.([0-9]+)\.[0-9]+([.-].*)?$ ]]; then
+              TAGS+=("${BASH_REMATCH[1]}.${BASH_REMATCH[2]}")
+            fi
+          else
+            TAGS+=("manual-${SHORT_SHA}")
+          fi
+
+          mapfile -t UNIQUE_TAGS < <(printf '%s\n' "${TAGS[@]}" | sort -u)
+          for TAG in "${UNIQUE_TAGS[@]}"; do
+            TARGET="${IMAGE}:${TAG}"
+            docker tag "$LOCAL_IMAGE" "$TARGET"
+            docker push "$TARGET"
+          done
+
+      - name: Log out of GHCR
+        if: always() && github.event_name != 'pull_request'
+        run: docker logout ghcr.io || true
