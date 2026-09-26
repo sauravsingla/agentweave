@@ -290,7 +290,7 @@ New router versions are evaluated on newly introduced untouched holdouts and the
 - Scored studies are frozen after scoring.
 - Weak and negative results are retained.
 - New router versions use newly introduced holdouts.
-- BFCL-derived evidence is not described as an official full BFCL leaderboard score.
+- BFCL-derived evidence is not described as an official BFCL leaderboard result.
 - Controlled synthetic execution is not described as production performance.
 - Routing accuracy is not presented as native task completion.
 - The Issue #38 controlled proxy artifact and real-provider artifacts are reported separately; provider/model/date/trial settings must accompany provider-backed claims.
