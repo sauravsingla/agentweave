@@ -22,7 +22,7 @@ jobs:
           import urllib.request
           from collections import Counter
 
-          URL = "https://sauravsingla08-agentweave.hf.space/"
+          URL = "https://sauravsingla08-agentweave.static.hf.space/"
           USERS = 100
 
           def hit(i):
