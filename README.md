@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/sauravsingla/agentweave/blob/main/LICENSE)
 [![Concept DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22913459.svg)](https://doi.org/10.5281/zenodo.22913459)
 [![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FFD21E)](https://huggingface.co/datasets/sauravsingla08/AgentWeave-Tool-Routing)
+[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E)](https://huggingface.co/spaces/sauravsingla08/AgentWeave)
 
 **Pre-inference tool routing for MCP and tool-rich LLM agents. Reduce what the model sees before function calling.**
 
@@ -21,7 +22,7 @@ AgentWeave is a provider-neutral **LLM tool-routing and policy-aware function-ca
 **Frozen BFCL-derived v6:** **6/48 native task successes vs 0/48 for matched baselines** · **70.18% fewer tools exposed** · **61.70% fewer input tokens** · **50.95% lower mean local-model latency**  
 *Routing-pressure experiment on a pinned local model; not an official full BFCL leaderboard score.*
 
-**Quick links:** [30-second install](#30-second-install) · [Local routing demo](#run-real-routing-locally-no-api-keys) · [MCP](#mcp-quickstart) · [Results](#results-at-a-glance) · [Documentation](#documentation) · [Contribute](https://github.com/sauravsingla/agentweave/blob/main/CONTRIBUTING.md) · [Road to 1.0](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md) · [Hugging Face Dataset](https://huggingface.co/datasets/sauravsingla08/AgentWeave-Tool-Routing) · [Paper](https://arxiv.org/abs/2608.23078)
+**Quick links:** [30-second install](#30-second-install) · [Local routing demo](#run-real-routing-locally-no-api-keys) · [MCP](#mcp-quickstart) · [Results](#results-at-a-glance) · [Documentation](#documentation) · [Contribute](https://github.com/sauravsingla/agentweave/blob/main/CONTRIBUTING.md) · [Road to 1.0](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md) · [Hugging Face Dataset](https://huggingface.co/datasets/sauravsingla08/AgentWeave-Tool-Routing) · [Live Space](https://huggingface.co/spaces/sauravsingla08/AgentWeave) · [Paper](https://arxiv.org/abs/2608.23078)
 
 ## 100,000-tool demo
 
