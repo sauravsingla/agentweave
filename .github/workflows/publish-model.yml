@@ -1,0 +1,44 @@
+name: Publish AgentWeave Router Model
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hf-model/**'
+      - '.github/workflows/publish-model.yml'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-model:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate model package
+        run: |
+          test -f hf-model/README.md
+          test -f hf-model/config.json
+          test -f hf-model/route_prototypes.json
+          test -f hf-model/router.py
+          test -f hf-model/requirements.txt
+
+      - name: Install Hugging Face CLI
+        run: |
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish model to Hugging Face
+        env:
+          HF_OIDC_RESOURCE: sauravsingla08/AgentWeave-Router-MiniLM
+        run: |
+          hf upload \
+            sauravsingla08/AgentWeave-Router-MiniLM \
+            hf-model \
+            . \
+            --commit-message "Publish AgentWeave Router MiniLM from ${GITHUB_SHA::7}"
