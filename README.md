@@ -62,9 +62,9 @@ agentweave doctor
 
 The PyPI distribution is `agentweave-router`; Python imports use `agentweave`. The base install does not require MCP, LangGraph, AutoGen, or provider credentials.
 
-### Run real routing locally — no API keys
+### Run real routing locally (no API keys)
 
-The repository includes a deterministic local example that exercises the real `AgentWeaveRuntime` routing, validation, authorization, and execution path with three tools and a scripted model:
+The repository includes a deterministic [local example](examples/local_runtime.py) that exercises the real `AgentWeaveRuntime` routing, validation, authorization, and execution path with three tools and a scripted model:
 
 ```bash
 git clone https://github.com/sauravsingla/agentweave.git
