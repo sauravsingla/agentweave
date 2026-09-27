@@ -1,0 +1,85 @@
+name: One-time Hugging Face Space 100-user test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hf-space-100-user-test.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  load-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run 100 concurrent requests against AgentWeave Space
+        run: |
+          python - <<'PY'
+          import concurrent.futures
+          import statistics
+          import time
+          import urllib.request
+          from collections import Counter
+
+          URL = "https://sauravsingla08-agentweave.hf.space/"
+          USERS = 100
+
+          def hit(i):
+              start = time.perf_counter()
+              req = urllib.request.Request(
+                  URL,
+                  headers={
+                      "User-Agent": "AgentWeave-authorized-space-load-test/1.0",
+                      "Cache-Control": "no-cache",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      body = r.read()
+                      status = r.status
+                  elapsed = (time.perf_counter() - start) * 1000
+                  return i, status, elapsed, len(body), None
+              except Exception as exc:
+                  elapsed = (time.perf_counter() - start) * 1000
+                  return i, None, elapsed, 0, repr(exc)
+
+          wall_start = time.perf_counter()
+          with concurrent.futures.ThreadPoolExecutor(max_workers=USERS) as ex:
+              results = list(ex.map(hit, range(1, USERS + 1)))
+          wall_s = time.perf_counter() - wall_start
+
+          ok = [x for x in results if x[1] == 200]
+          errors = [x for x in results if x[1] != 200]
+          lat = sorted(x[2] for x in results)
+
+          def pct(values, p):
+              if not values:
+                  return float('nan')
+              k = (len(values) - 1) * p
+              f = int(k)
+              c = min(f + 1, len(values) - 1)
+              if f == c:
+                  return values[f]
+              return values[f] + (values[c] - values[f]) * (k - f)
+
+          statuses = Counter(x[1] if x[1] is not None else "EXCEPTION" for x in results)
+          sizes = [x[3] for x in ok]
+
+          print(f"Target: {URL}")
+          print(f"Virtual users: {USERS}")
+          print(f"Success: {len(ok)}/{USERS}")
+          print(f"Failures: {len(errors)}/{USERS}")
+          print(f"Status distribution: {dict(statuses)}")
+          print(f"Wall time s: {wall_s:.3f}")
+          print(f"Observed throughput req/s: {USERS / wall_s:.2f}")
+          print(f"Latency ms min={min(lat):.1f} avg={statistics.mean(lat):.1f} p50={pct(lat,0.50):.1f} p95={pct(lat,0.95):.1f} p99={pct(lat,0.99):.1f} max={max(lat):.1f}")
+          if sizes:
+              print(f"Response bytes min={min(sizes)} avg={statistics.mean(sizes):.1f} max={max(sizes)}")
+          if errors:
+              for row in errors[:10]:
+                  print(f"Failure sample: user={row[0]} status={row[1]} latency_ms={row[2]:.1f} error={row[4]}")
+
+          if len(ok) < USERS:
+              raise SystemExit(f"Load test had {len(errors)} failed requests")
+          PY
