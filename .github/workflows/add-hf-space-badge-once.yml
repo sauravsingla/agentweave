@@ -1,0 +1,55 @@
+name: Add Hugging Face Space badge once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-hf-space-badge-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add Hugging Face Space badge and quick link
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('README.md')
+          text = p.read_text(encoding='utf-8')
+
+          dataset_badge = '[![Hugging Face Dataset](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Dataset-FFD21E)](https://huggingface.co/datasets/sauravsingla08/AgentWeave-Tool-Routing)'
+          space_badge = '[![Hugging Face Space](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Live%20Space-FFD21E)](https://huggingface.co/spaces/sauravsingla08/AgentWeave)'
+
+          if space_badge not in text:
+              if dataset_badge not in text:
+                  raise SystemExit('Expected Hugging Face Dataset badge not found')
+              text = text.replace(dataset_badge, dataset_badge + '\n' + space_badge, 1)
+
+          dataset_link = '[Hugging Face Dataset](https://huggingface.co/datasets/sauravsingla08/AgentWeave-Tool-Routing)'
+          space_link = '[Live Space](https://huggingface.co/spaces/sauravsingla08/AgentWeave)'
+          if space_link not in text:
+              if dataset_link not in text:
+                  raise SystemExit('Expected Hugging Face Dataset quick link not found')
+              text = text.replace(dataset_link, dataset_link + ' · ' + space_link, 1)
+
+          p.write_text(text, encoding='utf-8')
+          PY
+
+      - name: Commit README update and remove one-time workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f .github/workflows/add-hf-space-badge-once.yml
+          git add README.md .github/workflows/add-hf-space-badge-once.yml
+          git diff --cached --quiet && exit 0
+          git commit -m "docs: add AgentWeave Hugging Face Space"
+          git push origin HEAD:main
