@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/agentweave-router.svg)](https://pypi.org/project/agentweave-router/)
 [![GHCR](https://img.shields.io/badge/GHCR-agentweave-blue?logo=github)](https://github.com/sauravsingla/agentweave/pkgs/container/agentweave)
 [![Python](https://img.shields.io/pypi/pyversions/agentweave-router.svg)](https://pypi.org/project/agentweave-router/)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](https://github.com/sauravsingla/agentweave/blob/main/LICENSE)
 [![Concept DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22913459.svg)](https://doi.org/10.5281/zenodo.22913459)
 
 **Pre-inference tool routing for MCP and tool-rich LLM agents. Reduce what the model sees before function calling.**
@@ -13,18 +13,20 @@
 100+ permitted tools → route before inference → up to 8 model-visible tools by default → validate → authorize → execute
 ```
 
-AgentWeave is a provider-neutral **LLM tool-routing and secure function-calling boundary** for MCP, A2A, LangGraph, AutoGen, and custom tool catalogs. Deterministic scope comes first; task-aware routing operates only on the permitted remainder, and model-selected calls still pass schema validation and authorization before execution.
+AgentWeave is a provider-neutral **LLM tool-routing and policy-aware function-calling and execution boundary** for MCP, A2A, LangGraph, AutoGen, and custom tool catalogs. Deterministic scope comes first; task-aware routing operates only on the permitted remainder, and model-selected calls still pass schema validation and authorization before execution.
 
 **PyPI:** `agentweave-router` · **Python import:** `agentweave`
 
 **Frozen BFCL-derived v6:** **6/48 native task successes vs 0/48 for matched baselines** · **70.18% fewer tools exposed** · **61.70% fewer input tokens** · **50.95% lower mean local-model latency**  
 *Routing-pressure experiment on a pinned local model; not an official full BFCL leaderboard score.*
 
-**Quick links:** [30-second start](#30-second-start) · [Local routing demo](#run-real-routing-locally-no-api-keys) · [MCP](#mcp-quickstart) · [Results](#results-at-a-glance) · [Documentation](#documentation) · [Contribute](CONTRIBUTING.md) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078)
+**Quick links:** [30-second install](#30-second-install) · [Local routing demo](#run-real-routing-locally-no-api-keys) · [MCP](#mcp-quickstart) · [Results](#results-at-a-glance) · [Documentation](#documentation) · [Contribute](https://github.com/sauravsingla/agentweave/blob/main/CONTRIBUTING.md) · [Road to 1.0](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078)
 
 ## 100,000-tool demo
 
-[![AgentWeave 100,000-tool demo](assets/agentweave_100k_tools_demo_preview.gif)](assets/agentweave_100k_tools_silent_demo.mp4)
+[![AgentWeave 100,000-tool demo](https://raw.githubusercontent.com/sauravsingla/agentweave/main/assets/agentweave_100k_tools_demo_preview.gif)](https://github.com/sauravsingla/agentweave/blob/main/assets/agentweave_100k_tools_silent_demo.mp4)
+
+*Synthetic engineering-scale demonstration; not a production latency, memory, or capacity guarantee.*
 
 ```text
 catalog
@@ -50,7 +52,7 @@ bounded recovery / rediscovery
 
 AgentWeave does **not** replace MCP, LangGraph, AutoGen, A2A, or your model. It provides a provider-neutral routing and execution boundary around them.
 
-## 30-second start
+## 30-second install
 
 Install the base package from PyPI (Python 3.11+), then verify the CLI:
 
@@ -64,12 +66,12 @@ The PyPI distribution is `agentweave-router`; Python imports use `agentweave`. T
 
 ### Run real routing locally (no API keys)
 
-The repository includes a deterministic [local example](examples/local_runtime.py) that exercises the real `AgentWeaveRuntime` routing, validation, authorization, and execution path with three tools and a scripted model:
+The repository includes a deterministic [local example](https://github.com/sauravsingla/agentweave/blob/main/examples/local_runtime.py) that exercises the real `AgentWeaveRuntime` routing, validation, authorization, and execution path with three tools and a scripted model:
 
 ```bash
 git clone https://github.com/sauravsingla/agentweave.git
 cd agentweave
-python -m pip install -e '.[dev]'
+python -m pip install -e .
 python examples/local_runtime.py
 ```
 
@@ -85,28 +87,37 @@ Install the MCP extra:
 python -m pip install 'agentweave-router[mcp]'
 ```
 
-Connect your model endpoint and MCP server:
+Connect your model endpoint and MCP server. `base_url` is the OpenAI-compatible API root; AgentWeave appends `/chat/completions`:
 
 ```python
+import asyncio
+
 from agentweave import AgentWeaveApplication
 from agentweave_byom import OpenAICompatibleModelAdapter
 
-model = OpenAICompatibleModelAdapter(
-    model="my-model",
-    base_url="https://model.example/v1",
-    api_key="...",
-)
 
-app = AgentWeaveApplication.from_mcp(
-    "https://tools.example/mcp",
-    model=model,
-    max_tools=8,
-)
+async def main() -> None:
+    model = OpenAICompatibleModelAdapter(
+        model="my-model",
+        base_url="https://model.example/v1",
+        api_key="...",
+    )
 
-result = await app.run("Find invoice INV-7")
+    app = AgentWeaveApplication.from_mcp(
+        "https://tools.example/mcp",
+        model=model,
+        max_tools=8,
+    )
+
+    result = await app.run("Find invoice INV-7")
+    print(result.status)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
-`AgentWeaveApplication` owns the MCP/runtime/plugin lifecycle. AgentWeave handles discovery, scope policy, routing, schema validation, argument-aware authorization, execution, bounded recovery, provenance, and telemetry.
+`AgentWeaveApplication` owns the MCP/runtime/plugin lifecycle. AgentWeave handles discovery, scope policy, routing, schema validation, argument-aware authorization, execution, bounded recovery, provenance, and telemetry. A one-shot `app.run(...)` manages startup and shutdown automatically; for repeated calls, keep the lifecycle open with `async with app:`.
 
 Several MCP servers can be composed without silently collapsing same-name tools:
 
@@ -122,7 +133,7 @@ app = AgentWeaveApplication.from_mcps(
 
 If both servers expose native `search`, the model sees collision-safe names such as `billing__search` and `crm__search`, while execution is dispatched by canonical tool identity and each MCP server still receives its native tool name.
 
-A self-contained multi-MCP collision example is included in the repository:
+A self-contained [multi-MCP collision example](https://github.com/sauravsingla/agentweave/blob/main/examples/multi_mcp_collision.py) is included in the repository:
 
 ```bash
 python -m pip install -e '.[mcp]'
@@ -145,7 +156,7 @@ Typical use cases include large MCP catalogs, enterprise capability catalogs, mu
 
 If deterministic scope already reduces the catalog sufficiently, apply that first. AgentWeave's task-aware routing operates only on the permitted remainder.
 
-## Canonical runtime and security boundary
+## Canonical runtime and execution boundary
 
 `AgentWeaveRuntime` is the primary 0.7+ execution surface:
 
@@ -169,6 +180,8 @@ The canonical runtime enforces the following boundaries:
 
 For AgentWeave-owned HTTP traffic, `SafeHttpTransport` provides endpoint validation, DNS pinning/rebinding checks, guarded redirects, Host/SNI preservation, and cross-origin credential stripping. For MCP connections, the MCP SDK still owns the protocol wire transport unless the application supplies a custom client factory; AgentWeave validates the target before connection establishment rather than claiming ownership of the MCP SDK's transport.
 
+These are runtime controls and tested boundaries, not a formal security, compliance, or hardware-attestation certification.
+
 ### Application and configuration
 
 `AgentWeaveApplication` owns runtime and plugin startup/shutdown as one async boundary. Plugin startup is version-checked and transactional, so a partial startup failure is rolled back.
@@ -180,10 +193,19 @@ python -m pip install 'agentweave-router[yaml]'
 ```
 
 ```python
+import asyncio
+
 from agentweave import AgentWeaveApplication
 
-app = AgentWeaveApplication.from_file("agentweave.yaml")
-result = await app.run("Find the invoice and verify it")
+
+async def main() -> None:
+    app = AgentWeaveApplication.from_file("agentweave.yaml")
+    result = await app.run("Find the invoice and verify it")
+    print(result.status)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
 ```
 
 ## Integration model
@@ -223,7 +245,7 @@ docker run --rm ghcr.io/sauravsingla/agentweave:latest plugins
 docker run --rm ghcr.io/sauravsingla/agentweave:latest doctor
 ```
 
-For reproducible use, prefer an immutable digest or a release tag rather than `latest`. See [`docs/CONTAINER.md`](docs/CONTAINER.md) for persistent volumes, configuration mounts, published tags, and image design.
+For reproducible use, prefer an immutable digest or a release tag rather than `latest`. See [`docs/CONTAINER.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/CONTAINER.md) for persistent volumes, configuration mounts, published tags, and image design.
 
 ## Results at a glance
 
@@ -241,7 +263,7 @@ For reproducible use, prefer an immutable digest or a release tag rather than `l
 
 The BFCL-derived v6 study uses 48 fresh BFCL V4 `multiple` tasks, 16-tool pressure, and a pinned local model. The absolute success rate is shown alongside the relative efficiency improvements rather than reporting the relative gains alone.
 
-[Reproduce the BFCL study](docs/BFCL_REPRODUCE.md) · [Frozen v6 results](BFCL_V6_RESULTS.md) · [Research paper](https://arxiv.org/abs/2608.23078) · [`PAPER.md`](PAPER.md)
+[Reproduce the BFCL study](https://github.com/sauravsingla/agentweave/blob/main/docs/BFCL_REPRODUCE.md) · [Frozen v6 results](https://github.com/sauravsingla/agentweave/blob/main/BFCL_V6_RESULTS.md) · [Research paper](https://arxiv.org/abs/2608.23078) · [`PAPER.md`](https://github.com/sauravsingla/agentweave/blob/main/PAPER.md)
 
 ### Research boundaries
 
@@ -257,7 +279,7 @@ AgentWeave keeps routing, process-verification, executable-outcome, BFCL-derived
 
 The paper-quality evaluation also retains the post-hoc result that simple zero-shot embedding baselines outperform the original frozen AgentWeave router on the already-observed General-AgentBench set.
 
-See [`docs/ISSUE38_LIVE_PROVIDER.md`](docs/ISSUE38_LIVE_PROVIDER.md), [`docs/ROAD_TO_1_0.md`](docs/ROAD_TO_1_0.md), and the frozen artifacts under `evaluation/` for detailed protocols and holdout histories.
+See [`docs/ISSUE38_LIVE_PROVIDER.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/ISSUE38_LIVE_PROVIDER.md), [`docs/ROAD_TO_1_0.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md), and the frozen artifacts under `evaluation/` for detailed protocols and holdout histories.
 
 ## CLI
 
@@ -274,44 +296,44 @@ agentweave --config agentweave.yaml config-check
 agentweave --config agentweave.yaml run "Research and verify this topic"
 ```
 
-Legacy multi-agent orchestration remains available during the pre-1.0 migration, but new applications should start with `AgentWeaveRuntime` / `AgentWeaveApplication`. See [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md).
+Legacy multi-agent orchestration remains available during the pre-1.0 migration, but new applications should start with `AgentWeaveRuntime` / `AgentWeaveApplication`. See [`docs/API_COMPATIBILITY.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/API_COMPATIBILITY.md).
 
 ## Documentation
 
 | Area | Documentation |
 |---|---|
-| 0.7 quickstart | [`docs/QUICKSTART_0_7.md`](docs/QUICKSTART_0_7.md) |
-| Container image | [`docs/CONTAINER.md`](docs/CONTAINER.md) |
-| MCP | [`docs/MCP_INTEGRATION.md`](docs/MCP_INTEGRATION.md) |
-| A2A interoperability | [`docs/A2A_COMPATIBILITY.md`](docs/A2A_COMPATIBILITY.md) |
-| LangGraph | [`docs/LANGGRAPH_INTEGRATION.md`](docs/LANGGRAPH_INTEGRATION.md) |
-| AutoGen | [`docs/AUTOGEN_INTEGRATION.md`](docs/AUTOGEN_INTEGRATION.md) |
-| Issue #38 real-provider protocol | [`docs/ISSUE38_LIVE_PROVIDER.md`](docs/ISSUE38_LIVE_PROVIDER.md) |
-| Road to 1.0 | [`docs/ROAD_TO_1_0.md`](docs/ROAD_TO_1_0.md) |
-| BFCL reproduction | [`docs/BFCL_REPRODUCE.md`](docs/BFCL_REPRODUCE.md) |
-| API compatibility | [`docs/API_COMPATIBILITY.md`](docs/API_COMPATIBILITY.md) |
-| Research paper | [`PAPER.md`](PAPER.md) · [arXiv:2608.23078](https://arxiv.org/abs/2608.23078) |
+| 0.7 quickstart | [`docs/QUICKSTART_0_7.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/QUICKSTART_0_7.md) |
+| Container image | [`docs/CONTAINER.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/CONTAINER.md) |
+| MCP | [`docs/MCP_INTEGRATION.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/MCP_INTEGRATION.md) |
+| A2A interoperability | [`docs/A2A_COMPATIBILITY.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/A2A_COMPATIBILITY.md) |
+| LangGraph | [`docs/LANGGRAPH_INTEGRATION.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/LANGGRAPH_INTEGRATION.md) |
+| AutoGen | [`docs/AUTOGEN_INTEGRATION.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/AUTOGEN_INTEGRATION.md) |
+| Issue #38 real-provider protocol | [`docs/ISSUE38_LIVE_PROVIDER.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/ISSUE38_LIVE_PROVIDER.md) |
+| Road to 1.0 | [`docs/ROAD_TO_1_0.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md) |
+| BFCL reproduction | [`docs/BFCL_REPRODUCE.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/BFCL_REPRODUCE.md) |
+| API compatibility | [`docs/API_COMPATIBILITY.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/API_COMPATIBILITY.md) |
+| Research paper | [`PAPER.md`](https://github.com/sauravsingla/agentweave/blob/main/PAPER.md) · [arXiv:2608.23078](https://arxiv.org/abs/2608.23078) |
 | Evolving software project | [Concept DOI: 10.5281/zenodo.22913459](https://doi.org/10.5281/zenodo.22913459) |
 | Archived v0.7.0 software | [Zenodo v0.7.0](https://zenodo.org/records/22913460) · [Version DOI: 10.5281/zenodo.22913460](https://doi.org/10.5281/zenodo.22913460) |
-| Research citation | [`CITATION.cff`](CITATION.cff) |
+| Research citation | [`CITATION.cff`](https://github.com/sauravsingla/agentweave/blob/main/CITATION.cff) |
 
 ## Project status
 
 AgentWeave is an **active research and engineering project**. APIs and evaluation protocols may evolve; pin a release or commit when using results in reproducible experiments.
 
-The strongest current evidence is around pre-inference routing, interoperability, recovery, and reproducible evaluation. Published benchmark claims remain scoped to their documented models, datasets, protocols, and test environments. The proposed pre-1.0 freeze discipline and evidence gates are in [`docs/ROAD_TO_1_0.md`](docs/ROAD_TO_1_0.md).
+The strongest current evidence is around pre-inference routing, interoperability, recovery, and reproducible evaluation. Published benchmark claims remain scoped to their documented models, datasets, protocols, and test environments. The proposed pre-1.0 freeze discipline and evidence gates are in [`docs/ROAD_TO_1_0.md`](https://github.com/sauravsingla/agentweave/blob/main/docs/ROAD_TO_1_0.md).
 
 ## Contributing
 
 External reproductions are especially valuable. If you test AgentWeave on your own MCP server, tool catalog, agent framework, or benchmark, please open an issue or PR with what worked, what failed, and the catalog size.
 
-See [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md), [`CHANGELOG.md`](CHANGELOG.md), and [`CITATION.cff`](CITATION.cff).
+See [`CONTRIBUTING.md`](https://github.com/sauravsingla/agentweave/blob/main/CONTRIBUTING.md), [`SECURITY.md`](https://github.com/sauravsingla/agentweave/blob/main/SECURITY.md), [`CHANGELOG.md`](https://github.com/sauravsingla/agentweave/blob/main/CHANGELOG.md), and [`CITATION.cff`](https://github.com/sauravsingla/agentweave/blob/main/CITATION.cff).
 
 ## Paper and software citation
 
 **Research paper:**  
 **AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**  
-[arXiv:2608.23078](https://arxiv.org/abs/2608.23078) · [`PAPER.md`](PAPER.md)
+[arXiv:2608.23078](https://arxiv.org/abs/2608.23078) · [`PAPER.md`](https://github.com/sauravsingla/agentweave/blob/main/PAPER.md)
 
 **Evolving software project:**  
 **AgentWeave — Concept DOI:** [10.5281/zenodo.22913459](https://doi.org/10.5281/zenodo.22913459)
