@@ -1,0 +1,122 @@
+name: Publish AgentWeave to Hugging Face
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "evaluation/**"
+      - "research/benchmark_cases.json"
+      - "README.md"
+      - "PAPER.md"
+      - "BFCL_V5_RESULTS.md"
+      - "BFCL_V6_RESULTS.md"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: agentweave-huggingface-publish
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Hugging Face dataset package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf hf_dataset
+          mkdir -p hf_dataset/data hf_dataset/raw/evaluation hf_dataset/docs
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("research/benchmark_cases.json")
+          payload = json.loads(source.read_text(encoding="utf-8"))
+          out = Path("hf_dataset/data/benchmark_cases.jsonl")
+          with out.open("w", encoding="utf-8") as f:
+              for idx, query in enumerate(payload.get("cases", []), start=1):
+                  row = {
+                      "id": idx,
+                      "query": query,
+                      "dataset": payload.get("dataset", "AgentWeave Routing Benchmark v1"),
+                      "description": payload.get("description", ""),
+                  }
+                  f.write(json.dumps(row, ensure_ascii=False) + "\n")
+          PY
+
+          cp evaluation/*.json hf_dataset/raw/evaluation/
+          cp BFCL_V5_RESULTS.md hf_dataset/docs/
+          cp BFCL_V6_RESULTS.md hf_dataset/docs/
+          cp PAPER.md hf_dataset/docs/
+
+          cat > hf_dataset/README.md <<'EOF'
+          ---
+          license: apache-2.0
+          language:
+          - en
+          tags:
+          - agents
+          - function-calling
+          - tool-use
+          - tool-routing
+          - benchmark
+          - llm
+          pretty_name: AgentWeave Tool-Routing Benchmark
+          task_categories:
+          - text-generation
+          ---
+
+          # AgentWeave Tool-Routing Benchmark
+
+          Benchmark cases and evaluation artifacts for **AgentWeave**, a deterministic pre-inference routing layer for tool-rich language-model systems.
+
+          ## Contents
+
+          - `data/benchmark_cases.jsonl` — normalized benchmark prompts for Hugging Face Dataset Viewer.
+          - `raw/evaluation/` — frozen AgentWeave evaluation artifacts from the GitHub repository.
+          - `docs/` — BFCL result summaries and paper notes.
+
+          ## Paper
+
+          **AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**  
+          arXiv: https://arxiv.org/abs/2608.23078
+
+          ## Source code
+
+          GitHub: https://github.com/sauravsingla/agentweave
+
+          ## Notes
+
+          This Hub repository publishes benchmark/evaluation data rather than model weights. The AgentWeave runtime and implementation remain in the canonical GitHub repository.
+
+          ## License
+
+          Apache-2.0, matching the source repository.
+          EOF
+
+      - name: Install Hugging Face CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish dataset to Hugging Face
+        env:
+          HF_OIDC_RESOURCE: datasets/sauravsingla08/AgentWeave-Tool-Routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          hf upload sauravsingla08/AgentWeave-Tool-Routing hf_dataset . \
+            --repo-type=dataset \
+            --commit-message="Sync AgentWeave benchmark from GitHub ${GITHUB_SHA::7}"
