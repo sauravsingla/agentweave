@@ -28,6 +28,31 @@ jobs:
           test -f hf-model/router.py
           test -f hf-model/requirements.txt
 
+      - name: Show OIDC claims used for Trusted Publisher matching
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64, json, os, urllib.parse, urllib.request
+
+          url = os.environ["ACTIONS_ID_TOKEN_REQUEST_URL"]
+          sep = "&" if "?" in url else "?"
+          url += sep + urllib.parse.urlencode({"audience": "https://huggingface.co"})
+          req = urllib.request.Request(
+              url,
+              headers={"Authorization": "bearer " + os.environ["ACTIONS_ID_TOKEN_REQUEST_TOKEN"]},
+          )
+          with urllib.request.urlopen(req) as response:
+              token = json.load(response)["value"]
+          payload = token.split(".")[1]
+          payload += "=" * (-len(payload) % 4)
+          claims = json.loads(base64.urlsafe_b64decode(payload))
+          safe = {
+              key: claims.get(key)
+              for key in ("aud", "repository", "ref", "workflow_ref", "job_workflow_ref")
+          }
+          print(json.dumps(safe, indent=2))
+          PY
+
       - name: Install Hugging Face CLI
         run: |
           curl -LsSf https://hf.co/cli/install.sh | bash
