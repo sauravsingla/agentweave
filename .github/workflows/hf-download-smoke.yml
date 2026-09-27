@@ -1,0 +1,35 @@
+name: One-time Hugging Face download smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/hf-download-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  download-model:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Hugging Face Hub client
+        run: python -m pip install --quiet --upgrade huggingface_hub
+
+      - name: Download published AgentWeave model
+        run: |
+          python - <<'PY'
+          from huggingface_hub import snapshot_download
+          path = snapshot_download(
+              repo_id="sauravsingla08/AgentWeave-Router-MiniLM",
+              local_dir="/tmp/AgentWeave-Router-MiniLM",
+          )
+          print(f"Downloaded to: {path}")
+          PY
+
+      - name: Verify downloaded files
+        run: |
+          test -f /tmp/AgentWeave-Router-MiniLM/README.md
+          test -f /tmp/AgentWeave-Router-MiniLM/config.json
+          test -f /tmp/AgentWeave-Router-MiniLM/router.py
+          find /tmp/AgentWeave-Router-MiniLM -maxdepth 1 -type f -printf '%f\n' | sort
