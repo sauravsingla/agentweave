@@ -7,18 +7,22 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22913460.svg)](https://doi.org/10.5281/zenodo.22913460)
 
-**Pre-inference routing and secure execution for tool-rich LLM and multi-agent systems.**
+**Route large tool and agent catalogs down before the LLM has to reason over them.**
+
+```text
+100+ permitted tools → pre-inference routing → up to 8 model-visible tools by default → validate → authorize → execute
+```
+
+AgentWeave is a provider-neutral **pre-inference routing and secure execution boundary** for MCP, A2A, LangGraph, AutoGen, and custom tool catalogs. It reduces the model-visible action space while keeping **scope policy, authorization, provenance, recovery, and execution explicit**.
 
 **PyPI:** `agentweave-router` · **Python import:** `agentweave` · **Current release:** `v0.7.1`
-
-AgentWeave reduces the tools or agents visible to a model before inference while keeping **scope policy, authorization, provenance, recovery, and execution explicit**.
-
-> **Your agent has 100+ tools. Don't make the model reason over all of them. Route first, then reason over a smaller relevant action space.**
 
 **Frozen BFCL-derived v6 study:** 70.18% fewer tools exposed · 61.70% fewer input tokens · 50.95% lower mean local-model latency  
 **MCP · A2A · LangGraph · AutoGen · policy-aware routing · recovery · reproducible evaluation**
 
-**Quick links:** [30-second start](#30-second-start) · [Container](#container-image-ghcr) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
+> ⭐ **Using AgentWeave?** A GitHub star helps other MCP and agent developers discover the project.
+
+**Quick links:** [30-second start](#30-second-start) · [Demo](#demo-video) · [Container](#container-image-ghcr) · [Canonical runtime](#canonical-runtime) · [Results](#results-at-a-glance) · [0.7 quickstart](docs/QUICKSTART_0_7.md) · [MCP](docs/MCP_INTEGRATION.md) · [Contribute](CONTRIBUTING.md) · [Discussions](https://github.com/sauravsingla/agentweave/discussions) · [Road to 1.0](docs/ROAD_TO_1_0.md) · [Paper](https://arxiv.org/abs/2608.23078) · [Zenodo v0.7.0](https://zenodo.org/records/22913460)
 
 ## Demo Video
 
