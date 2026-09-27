@@ -1,0 +1,42 @@
+{
+  "research": [
+    "research a technical topic using authoritative sources",
+    "compare alternatives and gather supporting evidence",
+    "investigate prior work, documentation, or literature"
+  ],
+  "retrieval": [
+    "retrieve facts, records, documents, or external information",
+    "search for relevant evidence before answering",
+    "look up documentation, references, or source material"
+  ],
+  "analysis": [
+    "analyze evidence, systems, tradeoffs, risks, or behavior",
+    "reason over multiple inputs and identify important patterns",
+    "evaluate a technical claim or architecture"
+  ],
+  "coding": [
+    "write, inspect, debug, or modify source code",
+    "build a prototype or implementation",
+    "test code and identify correctness problems"
+  ],
+  "planning": [
+    "create an implementation plan, workflow, or sequence of actions",
+    "design a migration, experiment, or engineering approach",
+    "organize tasks and optimize the execution path"
+  ],
+  "verification": [
+    "verify a claim, result, constraint, or implementation",
+    "independently validate evidence or conclusions",
+    "check consistency, correctness, compliance, or reliability"
+  ],
+  "summarization": [
+    "summarize findings into a concise structured response",
+    "compress multiple analyses while preserving key conclusions",
+    "produce a clear synthesis of technical information"
+  ],
+  "data_analysis": [
+    "analyze a dataset and identify trends or anomalies",
+    "inspect metrics, measurements, tables, or experimental results",
+    "perform quantitative analysis and summarize findings"
+  ]
+}
