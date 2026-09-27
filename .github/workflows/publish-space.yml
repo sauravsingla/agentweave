@@ -1,0 +1,31 @@
+name: Publish AgentWeave Hugging Face Space
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'hf-space/**'
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-space:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Hugging Face CLI
+        run: |
+          curl -LsSf https://hf.co/cli/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Publish Space to Hugging Face
+        env:
+          HF_OIDC_RESOURCE: spaces/sauravsingla08/AgentWeave
+        run: |
+          hf upload spaces/sauravsingla08/AgentWeave hf-space . \
+            --commit-message "Sync AgentWeave Space from GitHub ${GITHUB_SHA::7}"
