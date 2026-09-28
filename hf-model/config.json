@@ -1,7 +1,10 @@
 {
   "model_type": "agentweave_semantic_router",
   "architecture": "prototype_cosine_router",
-  "base_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "encoder_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "encoder_usage": "frozen runtime dependency",
+  "weights_included": false,
+  "fine_tuned": false,
   "embedding_dimension": 384,
   "similarity": "cosine",
   "normalize_embeddings": true,
