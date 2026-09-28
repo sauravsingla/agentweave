@@ -42,14 +42,20 @@ jobs:
 
           source = Path("research/benchmark_cases.json")
           payload = json.loads(source.read_text(encoding="utf-8"))
+          cases = payload.get("cases", [])
+          if not isinstance(cases, list) or not cases:
+              raise SystemExit("research/benchmark_cases.json must contain a non-empty 'cases' list")
+
           out = Path("hf_dataset/data/benchmark_cases.jsonl")
           with out.open("w", encoding="utf-8") as f:
-              for idx, query in enumerate(payload.get("cases", []), start=1):
+              for idx, query in enumerate(cases, start=1):
+                  if not isinstance(query, str) or not query.strip():
+                      raise SystemExit(f"benchmark case {idx} must be a non-empty string")
                   row = {
                       "id": idx,
                       "query": query,
-                      "dataset": payload.get("dataset", "AgentWeave Routing Benchmark v1"),
-                      "description": payload.get("description", ""),
+                      "dataset": str(payload.get("dataset", "AgentWeave Routing Benchmark v1")),
+                      "description": str(payload.get("description", "")),
                   }
                   f.write(json.dumps(row, ensure_ascii=False) + "\n")
           PY
@@ -71,9 +77,16 @@ jobs:
           - tool-routing
           - benchmark
           - llm
+          - agentic-ai
           pretty_name: AgentWeave Tool-Routing Benchmark
           task_categories:
           - text-generation
+          configs:
+          - config_name: default
+            default: true
+            data_files:
+            - split: test
+              path: data/benchmark_cases.jsonl
           ---
 
           # AgentWeave Tool-Routing Benchmark
@@ -82,18 +95,22 @@ jobs:
 
           ## Contents
 
-          - `data/benchmark_cases.jsonl` — normalized benchmark prompts for Hugging Face Dataset Viewer.
-          - `raw/evaluation/` — frozen AgentWeave evaluation artifacts from the GitHub repository.
+          - `data/benchmark_cases.jsonl` — the canonical, normalized Dataset Viewer split.
+          - `raw/evaluation/` — frozen heterogeneous evaluation artifacts retained as reproducibility evidence and intentionally excluded from the Viewer schema.
           - `docs/` — BFCL result summaries and paper notes.
+
+          The explicit `configs.data_files` declaration above ensures Hugging Face renders only the normalized benchmark table in Dataset Viewer while preserving raw evaluation JSON files for download and audit.
 
           ## Paper
 
           **AgentWeave: Routing Before Reasoning for Efficient Function Calling in Tool-Rich Language Models**  
           arXiv: https://arxiv.org/abs/2608.23078
 
-          ## Source code
+          ## Related artifacts
 
-          GitHub: https://github.com/sauravsingla/agentweave
+          - Model/router artifact: https://huggingface.co/sauravsingla08/AgentWeave-Router-MiniLM
+          - Interactive Space: https://huggingface.co/spaces/sauravsingla08/AgentWeave
+          - Source code: https://github.com/sauravsingla/agentweave
 
           ## Notes
 
@@ -103,6 +120,27 @@ jobs:
 
           Apache-2.0, matching the source repository.
           EOF
+
+      - name: Validate Viewer-facing dataset schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path("hf_dataset/data/benchmark_cases.jsonl")
+          rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          if not rows:
+              raise SystemExit("Viewer-facing dataset is empty")
+          expected = {"id", "query", "dataset", "description"}
+          for idx, row in enumerate(rows, start=1):
+              if set(row) != expected:
+                  raise SystemExit(f"row {idx} schema mismatch: {sorted(row)}")
+              if not isinstance(row["id"], int) or not isinstance(row["query"], str):
+                  raise SystemExit(f"row {idx} has invalid field types")
+          print(f"Validated {len(rows)} normalized AgentWeave benchmark rows")
+          PY
 
       - name: Install Hugging Face CLI
         shell: bash
