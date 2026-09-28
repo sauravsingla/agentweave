@@ -22,11 +22,31 @@ jobs:
 
       - name: Validate model package
         run: |
+          set -euo pipefail
           test -f hf-model/README.md
           test -f hf-model/config.json
           test -f hf-model/route_prototypes.json
           test -f hf-model/router.py
           test -f hf-model/requirements.txt
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          card = Path("hf-model/README.md").read_text(encoding="utf-8")
+          config = json.loads(Path("hf-model/config.json").read_text(encoding="utf-8"))
+
+          if "\nbase_model:" in card:
+              raise SystemExit("Do not mark AgentWeave as a derived/fine-tuned base_model artifact")
+          if "library_name: sentence-transformers" in card:
+              raise SystemExit("Do not advertise this routing artifact as a SentenceTransformers checkpoint")
+          if config.get("fine_tuned") is not False:
+              raise SystemExit("config.json must explicitly state fine_tuned=false")
+          if config.get("weights_included") is not False:
+              raise SystemExit("config.json must explicitly state weights_included=false")
+          if not config.get("encoder_model"):
+              raise SystemExit("config.json must define encoder_model")
+          print("Validated AgentWeave routing-artifact metadata")
+          PY
 
       - name: Show OIDC claims used for Trusted Publisher matching
         shell: bash
