@@ -13,11 +13,12 @@ ROOT = Path(__file__).resolve().parent
 
 
 class AgentWeaveSemanticRouter:
-    """Prototype-based semantic capability router built on MiniLM embeddings.
+    """Prototype-based semantic capability router built on frozen MiniLM embeddings.
 
     This is an experimental semantic companion to AgentWeave's default
     deterministic routing path. It does not replace AgentWeave policy,
-    authorization, or execution controls.
+    authorization, or execution controls. The upstream encoder is loaded as a
+    runtime dependency; this repository is not a fine-tuned MiniLM model.
     """
 
     def __init__(
@@ -29,7 +30,10 @@ class AgentWeaveSemanticRouter:
         self.prototypes: Dict[str, List[str]] = json.loads(
             Path(prototypes_path).read_text(encoding="utf-8")
         )
-        self.model = SentenceTransformer(self.config["base_model"], device="cpu")
+        encoder_model = self.config.get("encoder_model") or self.config.get("base_model")
+        if not encoder_model:
+            raise ValueError("config.json must define 'encoder_model'")
+        self.model = SentenceTransformer(str(encoder_model), device="cpu")
 
         texts: List[str] = []
         labels: List[str] = []
